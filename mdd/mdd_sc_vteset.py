@@ -90,20 +90,21 @@ dolar = recupera_bd('cambio')
 dolar = dolar.iloc[0][0]                                  
 data_csv = yesterday.strftime("%d%b%Y")
 ################################# proporcao ##############################
-proporcao_fundos = recupera_bd2('proporcao_fundos')
+#proporcao_fundos = recupera_bd2('proporcao_fundos')
+proporcao_fundos = pd.read_excel(r'I:\Riscos\Maxdrawdown\prop.xlsx')
 
-prop_quali = proporcao_fundos[proporcao_fundos['fundo_origem']=='O3 MACRO INTERNATIONAL FUND']
-prop_quali = prop_quali[prop_quali['fundo_destino']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM']
-prop_quali = prop_quali[['data_ref','proporcao']]
-prop_quali = prop_quali.rename(columns={'data_ref':'val_date'})
-prop_quali ['proporcao'] =prop_quali ['proporcao']/100
-
+prop_quali = proporcao_fundos[proporcao_fundos['Origin']=='O3 MACRO INTERNATIONAL FUND']
+prop_quali = prop_quali[prop_quali['Destination']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM']
+prop_quali = prop_quali[['Date','Amount']]
+prop_quali = prop_quali.rename(columns={'Date':'val_date'})
+prop_quali ['Amount'] =prop_quali ['Amount']/100
+'''
 prop_geral = proporcao_fundos[proporcao_fundos['fundo_origem']=='O3 MACRO INTERNATIONAL FUND']
 prop_geral = prop_geral[prop_geral['fundo_destino']=='O3 RETORNO GLOBAL MASTER FIM']
 prop_geral = prop_geral[['data_ref','proporcao']]
 prop_geral = prop_geral.rename(columns={'data_ref':'val_date'})
 prop_geral ['proporcao'] =prop_geral ['proporcao']/100
-
+'''
 #-----------Atualizando a Historical Book Performance--------------------------
 hbp = recupera_bd2('select * from consolidado_pnl')
 
@@ -561,14 +562,14 @@ tgc_off = tgc_off.merge(position)
 
 tgc_off = tgc_off.merge(prop_quali,how='outer')
 tgc_off = tgc_off.sort_values('val_date').reset_index()
-tgc_off['proporcao'] = tgc_off['proporcao'].ffill()
+tgc_off['Amount'] = tgc_off['Amount'].ffill()
 tgc_off = tgc_off.dropna()
 tgc_off = tgc_off.drop(columns='index')
 
 #Dividindo pelo dolar
 tgc_off = tgc_off.merge(brl,how = 'outer')
 tgc_off['brl_curncy'] = tgc_off['brl_curncy'].ffill().bfill()
-tgc_off['tgc_off'] = (tgc_off['pl_total']*tgc_off['proporcao'])/(tgc_off['position_close'].shift(1)/tgc_off['brl_curncy'].shift(1)*pct_tgc_off)
+tgc_off['tgc_off'] = (tgc_off['pl_total']*(tgc_off['Amount'].shift(-1)))/(tgc_off['position_close'].shift(1)/tgc_off['brl_curncy'].shift(1)*pct_tgc_off)
 
 #tgc_off['tgc_off'] = tgc_off['pl_total']/(tgc_off['position_close'].shift(1)*(tgc_off['proporcao'].shift(1)/100)*pct_tgc_off/tgc_off['brl_curncy'].shift(1))
 #tgc_off = tgc_off.drop(columns = ['pl_total','brl'])
