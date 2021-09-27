@@ -14,10 +14,9 @@ import matplotlib.pyplot as plt
 from sqlalchemy import create_engine
 import datetime as dt
 from pandas.tseries.offsets import BDay
-import telegram_send
 
 param_dic = {
-   "host"      : "localhost",
+   "host"      : "54.207.157.118",
    "database"  : "o3risco",
    "user"      : "ltsurumaki",
    "password"  : "memude"
@@ -65,24 +64,23 @@ def export_txt(rpm_exe, t, o, p, data, nome):
         return o
 
 fundos_dic = {'rgq':'O3 RETORNO GLOBAL QUAIFICADO MASTER FIM','rgm':'O3 RETORNO GLOBAL MASTER FIM','glf':'O3 GLOBAL FUND','hdf':'TANTALO FIM CP IE'}
-
-t_mif = 'C:/Users/o3capital/Documents/Ludmilla/put_ratio/options_price.snx' 
-rpm_exe = 'C:/Users/o3capital/AppData/Local/Apps/2.0/ZQDYDTA0.V2R/T63G9M52.XPV/repo..tion_46f8e9fc3ea7ba85_0000.0000_3e79f2123ac79929/ReportsPortfolioManager5.exe' 
-o = 'C:/Users/o3capital/Documents/Ludmilla/put_ratio/historico/'
+t_mif = 'I:/Riscos/Opcoes/options_price.snx' 
+rpm_exe = 'C:/RPM/ReportsPortfolioManager.exe' 
+o = 'I:/Riscos/Opcoes/historico/'
 
 p_mif = 'valdate='+ hoje_str + ',BookReportLevel=10,ReportParent=Main,TradingDesk=O3 MACRO INTERNATIONAL FUND'
-
 ################################ RPM #####################################
 
 mif = export_txt(rpm_exe, t_mif, o, p_mif, hoje_str,'_nivel10_')
 
 for i in fundos_dic:
-    t_nav = 'C:/Users/o3capital/Documents/Ludmilla/put_ratio/nav_'+ i +'.snx'
+    t_nav = 'I:/Riscos/Opcoes/nav_'+ i +'.snx'
     p = 'valdate='+ hoje_str + ',BookReportLevel=1,ReportParent=Main,TradingDesk=' + fundos_dic[i]
     export_txt(rpm_exe, t_nav, o, p, hoje_str,'_nivel1_')
+
 PL = pd.DataFrame()
 for i in fundos_dic:
-    df = pd.read_csv('C:/Users/o3capital/Documents/Ludmilla/put_ratio/historico/nav_'+ i +'_nivel1_'+ hoje_str2 +'.txt', sep='\t')
+    df = pd.read_csv('I:/Riscos/Opcoes/historico/nav_'+ i +'_nivel1_'+ hoje_str2 +'.txt', sep='\t')
     df = df[['ValDate','NAV']]
     df ['fundo'] = i
     df = df.head(1)
@@ -91,7 +89,7 @@ for i in fundos_dic:
 PL['NAV'] = np.where(PL['fundo'] == 'glf',PL['NAV']*dolar,PL['NAV'])
 PL_tot = PL['NAV'].sum()
 
-products = pd.read_csv('C:/Users/o3capital/Documents/Ludmilla/put_ratio/historico/options_price_nivel10_' + hoje_str2 +'.txt', sep='\t')
+products = pd.read_csv('I:/Riscos/Opcoes/historico/options_price_nivel10_' + hoje_str2 +'.txt', sep='\t')
 products = products[['Product','YestPrice','Amount']]
 products = products[products['Product'].str.contains('SPX ')]
 products['YestPrice'] = products['YestPrice'].astype(float)
@@ -107,8 +105,7 @@ ff_ontem = ff_ontem.sort_values('val_date')
 ff_ontem = ff_ontem ['FF1 Comdty'].iloc[-1]
 
 risk_free = (100-ff_ontem)/100
-#put_ratio1
-options_list = pd.read_excel('C:/Users/o3capital/Documents/Ludmilla/put_ratio\options_list.xls')
+options_list = pd.read_excel('I:\Riscos\Opcoes\options_list.xlsx')
 options_list ['end'] = options_list ['option'].str[7:15]
 options_list ['strike'] = options_list ['option'].str[-4:]
 options_list ['tipo'] = options_list ['option'].str[16:17]
@@ -123,23 +120,6 @@ options_list['quantidade'] = -options_list['Amount']/options_list.iloc[0]['Amoun
 
 options_list = options_list.to_dict('index')
 n_options = len(options_list)
-
-#put_ratio2
-options_list2 = pd.read_excel('C:/Users/o3capital/Documents/Ludmilla/put_ratio\options_list2.xls')
-options_list2 ['end'] = options_list2 ['option'].str[7:15]
-options_list2 ['strike'] = options_list2 ['option'].str[-4:]
-options_list2 ['tipo'] = options_list2 ['option'].str[16:17]
-options_list2 ['end'] = pd.to_datetime(options_list2 ['end']).dt.date
-options_list2 ['strike'] = options_list2 ['strike'].astype(float)
-options_list2 ['tempo'] = options_list2 ['end'] - hoje
-options_list2 ['tempo'] = options_list2 ['tempo'] /np.timedelta64(1,'D')/365
-
-#preco e amount ontem
-options_list2 = options_list2.merge(products)
-options_list2['quantidade'] = -options_list2['Amount']/options_list2.iloc[0]['Amount']
-
-options_list2 = options_list2.to_dict('index')
-n_options2 = len(options_list2)
 
 '''
 
@@ -401,14 +381,15 @@ if __name__ == "__main__":
                perna3 = opt('P',Spot = spx[p],Strike = options_list[2]['strike'],r = risk_free,t = options_list[2]['tempo'],sigma = ratio_vol2 *vol[v]/100)
                px = options_list[0]['quantidade']*perna1.premium +options_list[1]['quantidade']*perna2.premium + options_list[2]['quantidade'] * perna3.premium
             else:
-                px = options_list[0]['quantidade']*perna1.premium +options_list[1]['quantidade']*perna2.premium
-                dt = options_list[0]['Amount']*delta(perna1) + options_list[1]['Amount']*delta(perna2)
-                dt = dt*spx[p]*100/(PL_tot/dolar)
+                px = options_list[0]['quantidade']*perna1.premium +options_list[1]['quantidade']*perna2.premium 
+                dt = options_list[0]['quantidade']*delta(perna1) + options_list[1]['quantidade']*delta(perna2)
             df = pd.DataFrame([[vol[v],spx[p],px]],columns=['vol','spot','px'])
             df1 = pd.DataFrame([[vol[v],spx[p],dt]],columns=['vol','spot','delta'])
             pay_2 = pay_2.append(df)
             delta_df = delta_df.append(df1)
 
+
+plt.figure(figsize=(25,25/1.618))
 
 #sns.heatmap(pay,xticklabels = spx,yticklabels = vol,cmap="viridis" )
 amount = - options_list[0]['Amount']
@@ -419,19 +400,16 @@ put_ratio_2 ['px'] = put_ratio_2['px']*amount*100*dolar/PL_tot
 put_ratio_2 ['val_date'] = ontem
 put_ratio_2['spot_ontem'] = spx_ontem
 spx_arred = np.round(spx,0)
-
-put_ratio_2.to_sql('put_ratio', 
-                  con=engine, 
-                  index=False, 
-                  if_exists='append')
-
-
+'''
 delta_df['val_date'] = ontem
 
 delta_df.to_sql('put_ratio_delta', 
                   con=engine, 
                   index=False, 
-                  if_exists='append')
+                  if_exists='replace')
 
-telegram_send.send(messages = ['Put Ratio OK!!'])
-
+put_ratio_2.to_sql('put_ratio', 
+                  con=engine, 
+                  index=False, 
+                  if_exists='append') 
+'''

@@ -97,6 +97,7 @@ prop_quali = prop_quali[prop_quali['fundo_destino']=='O3 RETORNO GLOBAL QUALIFIC
 prop_quali = prop_quali[['data_ref','proporcao']]
 prop_quali = prop_quali.rename(columns={'data_ref':'val_date'})
 prop_quali ['proporcao'] =prop_quali ['proporcao']/100
+prop_quali = prop_quali.drop_duplicates()
 
 prop_geral = proporcao_fundos[proporcao_fundos['fundo_origem']=='O3 MACRO INTERNATIONAL FUND']
 prop_geral = prop_geral[prop_geral['fundo_destino']=='O3 RETORNO GLOBAL MASTER FIM']
@@ -568,7 +569,8 @@ tgc_off = tgc_off.drop(columns='index')
 #Dividindo pelo dolar
 tgc_off = tgc_off.merge(brl,how = 'outer')
 tgc_off['brl_curncy'] = tgc_off['brl_curncy'].ffill().bfill()
-tgc_off['tgc_off'] = (tgc_off['pl_total']*tgc_off['proporcao'].shift(2))/(tgc_off['position_close'].shift(1)/tgc_off['brl_curncy'].shift(1)*pct_tgc_off)
+tgc_off['prop'] = tgc_off['proporcao'].shift(2).bfill()
+tgc_off['tgc_off'] = (tgc_off['pl_total']*tgc_off['prop'])/(tgc_off['position_close'].shift(1)/tgc_off['brl_curncy'].shift(1)*pct_tgc_off)
 
 #tgc_off['tgc_off'] = tgc_off['pl_total']/(tgc_off['position_close'].shift(1)*(tgc_off['proporcao'].shift(1)/100)*pct_tgc_off/tgc_off['brl_curncy'].shift(1))
 #tgc_off = tgc_off.drop(columns = ['pl_total','brl'])
@@ -579,31 +581,17 @@ tgc_off['tgc_off'] = (tgc_off['pl_total']*tgc_off['proporcao'].shift(2))/(tgc_of
 tgc_off = tgc_off.merge(sptr)
 
 tgc_off['sptr'] = tgc_off['sptr Index']/tgc_off['sptr Index'].shift(1)-1
+tgc_off['tgc_off1'] = tgc_off['tgc_off'] + 1
+tgc_off['sptr'] = tgc_off['sptr'] + 1
 
-primeiro = (tgc_off.loc[1]['tgc_off']+1)/(tgc_off.loc[1]['sptr']+1)*100 
-
-tgc_off['tgc_off'] = (tgc_off['tgc_off']+1)/(tgc_off['sptr']+1)
-tgc_off = tgc_off.replace(to_replace =tgc_off.loc[1]['tgc_off'],value = primeiro)
-tgc_off['tgc_off'] = tgc_off['tgc_off'].cumprod()
-tgc_off = tgc_off.drop(columns=['sptr','sptr Index'])
+tgc_off['ytd_pnl'] = (tgc_off['tgc_off1'].cumprod()-1)-(tgc_off['sptr'].cumprod()-1)
+tgc_off['tgc_off'] = (tgc_off['ytd_pnl']+1)/(tgc_off['ytd_pnl'].cummax()+1)-1
 
 
-#tgc_off2 = Maxdrawdown
-tgc_off2 = tgc_off.copy()
-tgc_off2['aux'] = np.where(tgc_off['tgc_off']>100,tgc_off['tgc_off'],100)
-tgc_off2['aux'] = tgc_off2['aux'].cummax()
-tgc_off2['tgc_off'] = tgc_off2['tgc_off']/tgc_off2['aux']-1
-tgc_off2 = tgc_off2.drop(columns = ['aux'])
-tgc_off['tgc_off'][0] = math.nan
-tgc_off2['tgc_off'][0] = math.nan
-#tgc_off3 = YtD PNL
-tgc_off3 = tgc_off.copy()
-tgc_off3['tgc_off'] = tgc_off3['tgc_off']/100-1
-
-'''
 #------------------------Maxdrawdown TGC Off-----------------------------------
 tgc_off_geral = macro_int[macro_int['book']=='TGC OFF']
 tgc_off_geral = tgc_off_geral[['val_date','pl_total']].groupby('val_date').sum().reset_index()
+
  
 #ajuste tiradentes
 pnl_tiradentes = tgc_off_geral[tgc_off_geral['val_date'] == dt.datetime(2021,4,21)]
@@ -629,7 +617,8 @@ tgc_off_geral = tgc_off_geral.drop(columns='index')
 #Dividindo pelo dolar
 tgc_off_geral = tgc_off_geral.merge(brl,how = 'outer')
 tgc_off_geral['brl_curncy'] = tgc_off_geral['brl_curncy'].ffill().bfill()
-tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['pl_total']*(tgc_off_geral['proporcao'].shift(1)))/(tgc_off_geral['position_close'].shift(1)/tgc_off_geral['brl_curncy'].shift(1)*pct_tgc_off)
+tgc_off_geral['prop'] = tgc_off_geral['proporcao'].shift(2).bfill()
+tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['pl_total']*tgc_off_geral['prop'])/(tgc_off_geral['position_close'].shift(1)/tgc_off_geral['brl_curncy'].shift(1)*pct_tgc_off)
 
 #tgc_off_geral['tgc_off_geral'] = tgc_off_geral['pl_total']/(tgc_off_geral['position_close'].shift(1)*(tgc_off_geral['proporcao'].shift(1)/100)*pct_tgc_off_geral/tgc_off_geral['brl_curncy'].shift(1))
 #tgc_off_geral = tgc_off_geral.drop(columns = ['pl_total','brl'])
@@ -638,26 +627,14 @@ tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['pl_total']*(tgc_off_geral['prop
 #subtrair SPX =(tgc+1-spx)
 
 tgc_off_geral = tgc_off_geral.merge(sptr)
+
 tgc_off_geral['sptr'] = tgc_off_geral['sptr Index']/tgc_off_geral['sptr Index'].shift(1)-1
+tgc_off_geral['tgc_off_geral1'] = tgc_off_geral['tgc_off_geral'] + 1
+tgc_off_geral['sptr'] = tgc_off_geral['sptr'] + 1
 
-primeiro = (tgc_off_geral.loc[1]['tgc_off_geral']+1)/(tgc_off_geral.loc[1]['sptr']+1)*100 
-
-tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['tgc_off_geral']+1)/(tgc_off_geral['sptr']+1)
-tgc_off_geral = tgc_off_geral.replace(to_replace =tgc_off_geral.loc[1]['tgc_off_geral'],value = primeiro)
-tgc_off_geral['tgc_off_geral'] = tgc_off_geral['tgc_off_geral'].cumprod()
-tgc_off_geral = tgc_off_geral.drop(columns=['sptr','sptr Index'])
+tgc_off_geral['ytd_pnl'] = (tgc_off_geral['tgc_off_geral1'].cumprod()-1)-(tgc_off_geral['sptr'].cumprod()-1)
+tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['ytd_pnl']+1)/(tgc_off_geral['ytd_pnl'].cummax()+1)-1
 
 
-#tgc_off_geral2 = Maxdrawdown
-tgc_off_geral2 = tgc_off_geral.copy()
-tgc_off_geral2['aux'] = np.where(tgc_off_geral['tgc_off_geral']>100,tgc_off_geral['tgc_off_geral'],100)
-tgc_off_geral2['aux'] = tgc_off_geral2['aux'].cummax()
-tgc_off_geral2['tgc_off_geral'] = tgc_off_geral2['tgc_off_geral']/tgc_off_geral2['aux']-1
-tgc_off_geral2 = tgc_off_geral2.drop(columns = ['aux'])
-tgc_off_geral['tgc_off_geral'][0] = math.nan
-tgc_off_geral2['tgc_off_geral'][0] = math.nan
-#tgc_off_geral3 = YtD PNL
-tgc_off_geral3 = tgc_off_geral.copy()
-tgc_off_geral3['tgc_off_geral'] = tgc_off_geral3['tgc_off_geral']/100-1
 
-'''
+
