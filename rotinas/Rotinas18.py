@@ -1289,13 +1289,17 @@ def perf_attrib():
     semana = (yesterday - BDay(5))
     mes = (yesterday - BDay(21))
     ytd = dt.datetime(2021,1,4)
+    mtd = dt.datetime(yesterday.year,yesterday.month,1)
+    mtd_str = mtd.strftime("%Y-%m-%d")
+    yesterday_count= yesterday.strftime("%Y-%m-%d")
+    mtd_n = np.busday_count(mtd_str,yesterday_count)
     
     ytd_geral = dt.datetime(2021,1,4)
     ytd_tendencias = dt.datetime(2021,1,4)
     ytd_tendencias_q = dt.datetime(2021,5,3)
     
     fundos = ['rgq','rgm','ms1','tge','tgq']
-    janelas = ['dia','semana','mes','ytd']
+    janelas = ['dia','semana','mes','ytd','mtd']
     
     def refresh_excel(SourcePathName,FileName):
         # Open Excel
@@ -1374,10 +1378,9 @@ def perf_attrib():
     sp_feriado3 = pd.DataFrame([[dt.datetime(2021, 9, 6),8311.47]],columns=['val_date','SPX Index']) 
     spx = spx.append([sp_feriado,sp_feriado2,sp_feriado3]).sort_values('val_date')
     
-    def spx_ibov(spx,ibov,data,sem,mes,ytd1,ytd2):
+    def spx_ibov(spx,ibov,data,sem,mes,ytd1,ytd2,mtd1):
         peso_ibov = 0.03
         peso_spx = 0.10
-    
         dia_spx = spx[spx['val_date']==data]
         
         ret_dia_spx = dia_spx.append(spx[spx['val_date']== data - BDay(1)]).reset_index()
@@ -1388,6 +1391,8 @@ def perf_attrib():
         ret_mes_spx = (ret_mes_spx.iloc[0]['SPX Index']/ret_mes_spx.iloc[1]['SPX Index']-1)*peso_spx
         ret_ytd_spx = dia_spx.append(spx[spx['val_date']== ytd1]).reset_index()
         ret_ytd_spx = (ret_ytd_spx.iloc[0]['SPX Index']/ret_ytd_spx.iloc[1]['SPX Index']-1)*peso_spx
+        ret_mtd_spx = dia_spx.append(spx[spx['val_date']== mtd1]).reset_index()
+        ret_mtd_spx = (ret_mtd_spx.iloc[0]['SPX Index']/ret_mtd_spx.iloc[1]['SPX Index']-1)*peso_spx
        
         dia_ibov = ibov[ibov['val_date']==data]
         
@@ -1399,22 +1404,26 @@ def perf_attrib():
         ret_mes_ibov = (ret_mes_ibov.iloc[0]['IBOV Index']/ret_mes_ibov.iloc[1]['IBOV Index']-1)*peso_ibov
         ret_ytd_ibov = dia_ibov.append(ibov[ibov['val_date']== ytd2]).reset_index()
         ret_ytd_ibov = (ret_ytd_ibov.iloc[0]['IBOV Index']/ret_ytd_ibov.iloc[1]['IBOV Index']-1)*peso_ibov
+        ret_mtd_ibov = dia_ibov.append(ibov[ibov['val_date']== mtd1]).reset_index()
+        ret_mtd_ibov = (ret_mtd_ibov.iloc[0]['IBOV Index']/ret_mtd_ibov.iloc[1]['IBOV Index']-1)*peso_ibov
         
         dia_spx = pd.DataFrame([[ret_dia_spx,'indice_spx','indice_spx','equity','dia']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         sem_spx = pd.DataFrame([[ret_sem_spx,'indice_spx','indice_spx','equity','semana']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         mes_spx = pd.DataFrame([[ret_mes_spx,'indice_spx','indice_spx','equity','mes']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         ytd_spx = pd.DataFrame([[ret_ytd_spx,'indice_spx','indice_spx','equity','ytd']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
-        
+        mtd_spx = pd.DataFrame([[ret_mtd_spx,'indice_spx','indice_spx','equity','mtd']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
+
         dia_ibov = pd.DataFrame([[ret_dia_ibov,'indice_ibov','indice_ibov','equity','dia']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         sem_ibov = pd.DataFrame([[ret_sem_ibov,'indice_ibov','indice_ibov','equity','semana']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         mes_ibov = pd.DataFrame([[ret_mes_ibov,'indice_ibov','indice_ibov','equity','mes']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         ytd_ibov = pd.DataFrame([[ret_ytd_ibov,'indice_ibov','indice_ibov','equity','ytd']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
+        mtd_ibov = pd.DataFrame([[ret_mtd_ibov,'indice_ibov','indice_ibov','equity','mtd']], columns = ['product_pl_pct','Book','Product','estrategia1','janela'])
         
-        spx_ret = dia_spx.append([sem_spx,mes_spx,ytd_spx])
+        spx_ret = dia_spx.append([sem_spx,mes_spx,ytd_spx,mtd_spx])
         spx_ret['estrategia2'] = 'dm'
         spx_ret['estrategia3'] = 'America'
         spx_ret['estrategia4'] = 'indice_spx'
-        ibov_ret = dia_ibov.append([sem_ibov,mes_ibov,ytd_ibov])
+        ibov_ret = dia_ibov.append([sem_ibov,mes_ibov,ytd_ibov,mtd_ibov])
         ibov_ret['estrategia2'] = 'em'
         ibov_ret['estrategia3'] = 'BZ'
         ibov_ret['estrategia4'] = 'indice_ibov'
@@ -1425,7 +1434,7 @@ def perf_attrib():
     ytd_sptr = dt.datetime(2020,12,31)
     ytd_ib= dt.datetime(2020,12,30)
     
-    spx_ibov_ret = spx_ibov(spx,ibov,yesterday,semana,mes,ytd_sptr,ytd_ib)
+    spx_ibov_ret = spx_ibov(spx,ibov,yesterday,semana,mes,ytd_sptr,ytd_ib,mtd)
     spx_ret = spx_ibov_ret[spx_ibov_ret['Book'] == 'indice_spx']
     ibov_ret = spx_ibov_ret[spx_ibov_ret['Book'] == 'indice_ibov'] 
     
@@ -1500,8 +1509,8 @@ def perf_attrib():
     nova_perfee = pd.read_excel('I:/Riscos/PnL/nova_perfee.xlsx' )
     nova_perfee['val_date'] = yesterday.date()
     #######################################################
-    #atualiza = to_alchemy_append(nova_perfee,'perf_fee')
-    atualiza = to_alchemy_append_n(nova_perfee,'perf_fee')
+    
+    #######################################################atualiza = to_alchemy_append_n(nova_perfee,'perf_fee')
     #######################################################
     #puxando e calculando as perf fees
     perf_fee = recupera_bd('perf_fee')
@@ -1528,9 +1537,10 @@ def perf_attrib():
             b = min(21,len(fundo['trading_desk']))
             ytd2 = fundo['aux2'].prod()-1
             dia = fundo['aux2'].tail(1).prod()-1
+            mtd2 = fundo['aux2'].tail(mtd_n).prod()-1
             semana = fundo['aux2'].tail(a).prod()-1
             mes = fundo['aux2'].tail(b).prod()-1
-            perf_fee_ontem = perf_fee_ontem.append(pd.DataFrame([[i,dia,semana,mes,ytd2]],columns=['trading_desk','dia','semana','mes','ytd']))
+            perf_fee_ontem = perf_fee_ontem.append(pd.DataFrame([[i,dia,semana,mes,ytd2,mtd2]],columns=['trading_desk','dia','semana','mes','ytd','mtd']))
     
         else:
             fundo = perf_fee[perf_fee['trading_desk'] ==i].sort_values('val_date')
@@ -1543,7 +1553,8 @@ def perf_attrib():
             dia = fundo['aux2'].tail(1).prod()-1
             semana = fundo['aux2'].tail(5).prod()-1
             mes = fundo['aux2'].tail(21).prod()-1
-            perf_fee_ontem = perf_fee_ontem.append(pd.DataFrame([[i,dia,semana,mes,ytd2]],columns=['trading_desk','dia','semana','mes','ytd']))
+            mtd2 = fundo['aux2'].tail(mtd_n).prod()-1
+            perf_fee_ontem = perf_fee_ontem.append(pd.DataFrame([[i,dia,semana,mes,ytd2,mtd2]],columns=['trading_desk','dia','semana','mes','ytd','mtd']))
     
     
     
@@ -1575,7 +1586,12 @@ def perf_attrib():
     perf_fee_tendencias_mes = perf_fee_ontem.iloc[2]['mes']
     perf_fee_tendencias_q_mes = perf_fee_ontem.iloc[3]['mes']
     
-    feriados = 3
+    perf_fee_quali_mtd = perf_fee_ontem.iloc[0]['mtd']
+    perf_fee_geral_mtd = perf_fee_ontem.iloc[1]['mtd']
+    perf_fee_tendencias_mtd = perf_fee_ontem.iloc[2]['mtd']
+    perf_fee_tendencias_q_mtd = perf_fee_ontem.iloc[3]['mtd']
+    
+    feriados = 4
     dias_ytd = np.busday_count(ytd.date(),yesterday.date())-feriados
     
     dias_ytd_geral = np.busday_count(ytd_geral.date(),yesterday.date())-feriados
@@ -1588,29 +1604,34 @@ def perf_attrib():
     taxa_sem_quali = -(taxa_adm**(5/252)-1)+perf_fee_quali_semana
     taxa_mes_quali = -(taxa_adm**(21/252)-1)+perf_fee_quali_mes
     taxa_ytd_quali = -(taxa_adm**(dias_ytd/252)-1)+perf_fee_quali
+    taxa_mtd_quali = -(taxa_adm**(mtd_n/252)-1)+perf_fee_quali_mtd
     
     taxa_dia_geral = -(taxa_adm**(1/252)-1)+perf_fee_geral_dia
     taxa_sem_geral = -(taxa_adm**(5/252)-1)+perf_fee_geral_semana
     taxa_mes_geral = -(taxa_adm**(21/252)-1)+perf_fee_geral_mes
     taxa_ytd_geral = -(taxa_adm**(dias_ytd_geral/252)-1)+perf_fee_geral
+    taxa_mtd_geral = -(taxa_adm**(mtd_n/252)-1)+perf_fee_geral_mtd
     
     taxa_dia_tendencias = -(taxa_adm**(1/252)-1)+perf_fee_tendencias_dia
     taxa_sem_tendencias = -(taxa_adm**(5/252)-1)+perf_fee_tendencias_semana
     taxa_mes_tendencias = -(taxa_adm**(21/252)-1)+perf_fee_tendencias_mes
     taxa_ytd_tendencias = -(taxa_adm**(dias_ytd_tendencias/252)-1)+perf_fee_tendencias
+    taxa_mtd_tendencias = -(taxa_adm**(mtd_n/252)-1)+perf_fee_tendencias_mtd
     
-    aa =-(taxa_adm**(dias_ytd_tendencias/252)-1)
     
     taxa_dia_tendencias_q = -(taxa_adm**(1/252)-1)+perf_fee_tendencias_q_dia
     taxa_sem_tendencias_q = -(taxa_adm**(5/252)-1)+perf_fee_tendencias_q_semana
     taxa_mes_tendencias_q = -(taxa_adm**(21/252)-1)+perf_fee_tendencias_q_mes
     taxa_ytd_tendencias_q = -(taxa_adm**(dias_ytd_tendencias_q/252)-1)+perf_fee_tendencias_q
+    taxa_mtd_tendencias_q = -(taxa_adm**(mtd_n/252)-1)+perf_fee_tendencias_q_mtd
     
     custos_dia_quali = pd.DataFrame([[taxa_dia_quali,'custos','custos','custos','dia','rgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_sem_quali = pd.DataFrame([[taxa_sem_quali,'custos','custos','custos','semana','rgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_mes_quali = pd.DataFrame([[taxa_mes_quali,'custos','custos','custos','mes','rgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_ytd_quali = pd.DataFrame([[taxa_ytd_quali,'custos','custos','custos','ytd','rgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
-    custos_quali = custos_dia_quali.append([custos_sem_quali,custos_mes_quali,custos_ytd_quali])
+    custos_mtd_quali = pd.DataFrame([[taxa_mtd_quali,'custos','custos','custos','mtd','rgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
+    
+    custos_quali = custos_dia_quali.append([custos_sem_quali,custos_mes_quali,custos_ytd_quali,custos_mtd_quali])
     custos_quali['Book'] = 'custos'
     custos_quali['Product'] = 'custos'
     custos_quali['estrategia2'] = 'custos'
@@ -1621,7 +1642,9 @@ def perf_attrib():
     custos_sem_geral = pd.DataFrame([[taxa_sem_geral,'custos','custos','custos','semana','rgm']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_mes_geral = pd.DataFrame([[taxa_mes_geral,'custos','custos','custos','mes','rgm']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_ytd_geral = pd.DataFrame([[taxa_ytd_geral,'custos','custos','custos','ytd','rgm']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
-    custos_geral = custos_dia_geral.append([custos_sem_geral,custos_mes_geral,custos_ytd_geral])
+    custos_mtd_geral = pd.DataFrame([[taxa_mtd_geral,'custos','custos','custos','mtd','rgm']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
+    
+    custos_geral = custos_dia_geral.append([custos_sem_geral,custos_mes_geral,custos_ytd_geral,custos_mtd_geral])
     custos_geral['Book'] = 'custos'
     custos_geral['Product'] = 'custos'
     custos_geral['estrategia2'] = 'custos'
@@ -1633,7 +1656,9 @@ def perf_attrib():
     custos_sem_tendencias = pd.DataFrame([[taxa_sem_tendencias,'custos','custos','custos','semana','tge']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_mes_tendencias = pd.DataFrame([[taxa_mes_tendencias,'custos','custos','custos','mes','tge']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_ytd_tendencias = pd.DataFrame([[taxa_ytd_tendencias,'custos','custos','custos','ytd','tge']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
-    custos_tendencias = custos_dia_tendencias.append([custos_sem_tendencias,custos_mes_tendencias,custos_ytd_tendencias])
+    custos_mtd_tendencias = pd.DataFrame([[taxa_mtd_tendencias,'custos','custos','custos','mtd','tge']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
+    
+    custos_tendencias = custos_dia_tendencias.append([custos_sem_tendencias,custos_mes_tendencias,custos_ytd_tendencias,custos_mtd_tendencias])
     custos_tendencias['Book'] = 'custos'
     custos_tendencias['Product'] = 'custos'
     custos_tendencias['estrategia2'] = 'custos'
@@ -1644,7 +1669,8 @@ def perf_attrib():
     custos_sem_tendencias_q = pd.DataFrame([[taxa_sem_tendencias_q,'custos','custos','custos','semana','tgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_mes_tendencias_q = pd.DataFrame([[taxa_mes_tendencias_q,'custos','custos','custos','mes','tgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
     custos_ytd_tendencias_q = pd.DataFrame([[taxa_ytd_tendencias_q,'custos','custos','custos','ytd','tgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
-    custos_tendencias_q = custos_dia_tendencias_q.append([custos_sem_tendencias_q,custos_mes_tendencias_q,custos_ytd_tendencias_q])
+    custos_mtd_tendencias_q = pd.DataFrame([[taxa_mtd_tendencias_q,'custos','custos','custos','mtd','tgq']],columns = ['product_pl_pct','pm','on_off','estrategia1','janela','trading_desk'])
+    custos_tendencias_q = custos_dia_tendencias_q.append([custos_sem_tendencias_q,custos_mes_tendencias_q,custos_ytd_tendencias_q,custos_mtd_tendencias_q])
     custos_tendencias_q['Book'] = 'custos'
     custos_tendencias_q['Product'] = 'custos'
     custos_tendencias_q['estrategia2'] = 'custos'
