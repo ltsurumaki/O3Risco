@@ -572,9 +572,8 @@ tgc_off['brl_curncy'] = tgc_off['brl_curncy'].ffill().bfill()
 tgc_off['prop'] = tgc_off['proporcao'].shift(2).bfill()
 tgc_off['tgc_off'] = (tgc_off['pl_total']*tgc_off['prop'])/(tgc_off['position_close'].shift(1)/tgc_off['brl_curncy'].shift(1)*pct_tgc_off)
 
-#tgc_off['tgc_off'] = tgc_off['pl_total']/(tgc_off['position_close'].shift(1)*(tgc_off['proporcao'].shift(1)/100)*pct_tgc_off/tgc_off['brl_curncy'].shift(1))
-#tgc_off = tgc_off.drop(columns = ['pl_total','brl'])
-#tgc_off = tgc_off.drop(columns=['brl_curncy','position_close'])
+tgc_off = tgc_off.drop(columns = ['pl_total','brl','brl_curncy','position_close'])
+
 
 #subtrair SPX =(tgc+1-spx)
 
@@ -620,10 +619,6 @@ tgc_off_geral['brl_curncy'] = tgc_off_geral['brl_curncy'].ffill().bfill()
 tgc_off_geral['prop'] = tgc_off_geral['proporcao'].shift(2).bfill()
 tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['pl_total']*tgc_off_geral['prop'])/(tgc_off_geral['position_close'].shift(1)/tgc_off_geral['brl_curncy'].shift(1)*pct_tgc_off)
 
-#tgc_off_geral['tgc_off_geral'] = tgc_off_geral['pl_total']/(tgc_off_geral['position_close'].shift(1)*(tgc_off_geral['proporcao'].shift(1)/100)*pct_tgc_off_geral/tgc_off_geral['brl_curncy'].shift(1))
-#tgc_off_geral = tgc_off_geral.drop(columns = ['pl_total','brl'])
-#tgc_off_geral = tgc_off_geral.drop(columns=['brl_curncy','position_close'])
-
 #subtrair SPX =(tgc+1-spx)
 
 tgc_off_geral = tgc_off_geral.merge(sptr)
@@ -634,7 +629,7 @@ tgc_off_geral['sptr'] = tgc_off_geral['sptr'] + 1
 
 tgc_off_geral['ytd_pnl'] = (tgc_off_geral['tgc_off_geral1'].cumprod()-1)-(tgc_off_geral['sptr'].cumprod()-1)
 tgc_off_geral['tgc_off_geral'] = (tgc_off_geral['ytd_pnl']+1)/(tgc_off_geral['ytd_pnl'].cummax()+1)-1
-
-
+tgc_off_geral['book'] = 'tgc_off'
+tgc_off_geral['trading_desk'] = 'rgm'
 
 
