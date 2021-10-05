@@ -5,6 +5,8 @@ Created on Tue Sep 28 13:24:03 2021
 @author: ludmilla.tsurumaki
 """
 import pandas as pd
+import os
+import glob
 import fitz
 import re
 import nltk
@@ -37,15 +39,17 @@ connect = "postgresql+psycopg2://%s:%s@%s:5432/%s" % (
 engine = create_engine(connect) 
 
 #--------------------------------- Arquivos ----------------------------------                        
-pasta = 'I:/Riscos/Earnings call/'
-docs = ['20200429_Microsoft_Corp-_Earnings_Call_2020-4-29_DN000000002830540408.pdf','20210427_Microsoft_Corp-_Earnings_Call_2021-4-27_DN000000002955672193.pdf','20210727_Microsoft_Corp-_Earnings_Call_2021-7-27_DN000000002961144705.pdf']
+pasta = 'I:/Riscos/Earnings call/MSFT US/'
+os.chdir(pasta)
+extension = 'pdf'
+docs = [i for i in glob.glob('*.{}'.format(extension))]
 #----------------------------- Limpeza dos textos ----------------------------
 stop_words= set(stopwords.words("english"))
 
 msft = pd.DataFrame()
 for i in docs:
     doc = fitz.open(pasta + i)
-    n_pages = 20
+    n_pages = doc.page_count
     text  = str()
     for pg in range(n_pages):
         page = doc[pg]

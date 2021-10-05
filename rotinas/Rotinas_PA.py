@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Fri Oct  1 15:05:36 2021
+
+@author: ludmilla.tsurumaki
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Mon Mar 29 09:21:49 2021
 
 @author: ludmilla.tsurumaki
@@ -208,6 +215,120 @@ def query_bd(query):
     connection.execute(query)
     return 0
 
+def import_bbg():
+    hoje = dt.datetime.today().strftime("%m/%d/%Y")
+    start = dt.datetime.today() - relativedelta(months=126)
+    start = start.strftime("%m/%d/%Y")
+    
+    bzaccetp = BBG.fetch_series('BZACCETP Index','PX_Last','01/01/2012', hoje)
+    bzaccetp.to_csv('I:/Riscos/Maxdrawdown/bzaccetp.csv')
+    
+    sptr = BBG.fetch_series('SPTR500N Index','PX_Last',start,hoje, fx = 'USD')
+    sptr.to_csv('I:/Riscos/Maxdrawdown/sptr.csv')
+    
+    ibov = BBG.fetch_series('IBOV Index','PX_Last', start,hoje, fx = 'BRL')
+    ibov.to_csv('I:/Riscos/Maxdrawdown/ibov.csv')
+    
+    brl = BBG.fetch_series('BRL Curncy','PX_Last',start,hoje, fx = 'BRL')
+    brl.to_csv('I:/Riscos/Maxdrawdown/brl.csv')
+    
+    spx = BBG.fetch_series('SPX Index','PX_Last',start,hoje, fx= 'USD')
+    spx.to_csv('I:/Riscos/Maxdrawdown/spx.csv')
+    
+    ten_yr_treasury = BBG.fetch_series('USGG10YR Index','PX_Last',start,hoje, fx= 'USD')
+    ten_yr_treasury .to_csv('I:/Riscos/Maxdrawdown/10yr_treasury.csv')
+ 
+    pre_3_anos = BBG.fetch_series('BZAD3Y Index','PX_Last',start,hoje, fx= 'BRL')
+    pre_3_anos.to_csv('I:/Riscos/Maxdrawdown/pre_3_anos.csv')
+    
+    dolar_real= BBG.fetch_series('USDBRL REGN Curncy','PX_Last',start,hoje, fx= 'BRL')
+    dolar_real.to_csv('I:/Riscos/Maxdrawdown/dolar_real.csv')
+    
+    dxy= BBG.fetch_series('DXY Curncy','PX_Last',start,hoje, fx= 'USD')
+    dxy.to_csv('I:/Riscos/Maxdrawdown/dxy.csv')
+    
+    print('Dados da BBG importados.')
+    return 0
+
+def atualiza_depara():
+    data_csv = yesterday.strftime("%d%b%Y")
+    #----------------Liquidez-----------------------
+    base_liqui = pd.read_csv('I:\Riscos\Liquidez\Base\OverviewReport_' + data_csv +'.txt',sep='\t',header=(0))
+    base_liqui1 = base_liqui[['TradingDesk','ClassID','Product','ExpiryDate','Amount','Position']]
+    
+    depara = pd.read_csv('I:\Riscos\Liquidez\DePara.csv',header=(0))
+    
+    base_liqui2 = base_liqui1.merge(depara,how='left',left_on=['Product'],right_on=['Product'])
+    
+    
+    base_liqui2['Ativo_100p'] = base_liqui2['ClassID'].apply(lambda x: 1 if x == 153 or x ==  138 or \
+                                                                  x == 70 \
+                                                                  or x == 22 or x == 162 \
+                                                                  else 0)
+    base_liqui2 = base_liqui2[base_liqui2['Ativo_100p'] ==0]
+    
+    base_aux1 = base_liqui2.drop_duplicates()
+    
+    de_para_liqu = base_aux1[['Product','Bloomberg']]
+    de_para_liqu = de_para_liqu[de_para_liqu['Bloomberg'].isnull()]
+    
+    base_aux = pd.read_csv('I:\Riscos\Liquidez\Base\FundOverviewByPrimitive_' + data_csv +'.txt',sep='\t',header=(0))
+    base_aux = base_aux [['Product', 'ProductClass']]
+    de_para_liqu = de_para_liqu.merge(base_aux) 
+    de_para_liqu = de_para_liqu.drop_duplicates()
+    de_para_liqu = de_para_liqu[['Product', 'ProductClass', 'Bloomberg']]
+    
+    
+    #----------------Shorts-----------------------
+    base_lote = pd.read_csv('I:\Riscos\Shorts\Base\FundOverviewByPrimitive_' + data_csv +'.txt',sep='\t',header=(0))
+      
+    
+    tabela_equity =  base_lote[base_lote['ProductClass'].str.contains('Equity')]
+    tabela_etf =  base_lote[base_lote['ProductClass']=='ETF']
+    tabela_adr =  base_lote[base_lote['ProductClass']=='ADR']
+    tabela_swap = base_lote[base_lote['ProductClass']=='Swaption USD']
+    tabela = tabela_equity.append(tabela_etf) 
+    tabela = tabela.append(tabela_adr)
+    tabela = tabela.append(tabela_swap)
+    tabela_final = tabela.merge(depara,how='left',left_on=['Product'],right_on=['Product'])
+    
+    de_para_shorts = tabela_final[['Product','ProductClass','Bloomberg']]
+    de_para_shorts = de_para_shorts[de_para_shorts['Bloomberg'].isnull()].drop_duplicates()
+    
+    #----------------Tunel-----------------------
+    fundos = ['rgq','rgm','ms1','ms2','tge','mif','glf']
+    pasta_credito = 'I:/Riscos/Ludmilla/Distribuicao_Ordens/Historico/'
+    tabela = pd.DataFrame()
+    data_csv = yesterday.strftime("%Y%m%d")
+    for i in range(len(fundos)):
+        temp_df = pd.read_csv(pasta_credito + 'distrib_ordens_' + fundos[i]+ data_csv +'.txt', sep='\t')
+        temp_df['tradingdesk'] = fundos[i]
+        tabela = tabela.append(temp_df)
+        
+    filtro = ~tabela['ProductClass'].isin(['Cash', 'Overnight','Provisions and Costs','Currencies NDF'])
+    tabela = tabela.loc[filtro]
+    tabela = tabela.merge(depara,how='left',left_on=['Product'],right_on=['Product']) 
+    de_para_tunel = tabela[['Product','ProductClass','Bloomberg']]
+    de_para_tunel = de_para_tunel[de_para_tunel['Bloomberg'].isnull()].drop_duplicates()
+    #----------------Todos-----------------------
+    atualiza_de_para = de_para_liqu.append(de_para_shorts)
+    atualiza_de_para = atualiza_de_para.append(de_para_tunel).drop_duplicates()
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'Currencies Forward']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'ADR']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'ETF Options']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'USDBRLFuture']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'Debenture com participação nos lucros']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'Funds BR']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'Currencies NDF']
+    atualiza_de_para = atualiza_de_para[atualiza_de_para ['ProductClass'] != 'LFT']
+    #atualiza_de_para = pd.DataFrame([[1,2,3]])
+    if len(atualiza_de_para)>0:
+        atualiza_de_para.to_csv('I:/Riscos/Liquidez/atualiza_de_para.csv')
+        print('Atualizar DePara!!!')
+    else:
+        print('DePara OK.')
+    return 0
+
 def atualiza_cambio():
     cambio = pd.read_csv(r'I:\Riscos\Ludmilla\cambio.csv')
     to_alchemy_replace_n(cambio,'cambio')
@@ -254,6 +375,8 @@ def atualiza_obs():
 dolar = recupera_bd('cambio')
 dolar = dolar.iloc[0][0]
 ############################ Risco de Mercado ############################
+
+
 
 def var():
 
@@ -681,8 +804,8 @@ def var():
         else:
             geral_res_book = geral_res_book.append(a)
         
-    book_global_lote = ['TDM','TGC OFF', 'TRM','TNK']
-    book_global_bd = ['tdm','tgc_off', 'trm','tnk']    
+    book_global_lote = ['TDM','TGC LOCAL','TGC OFF', 'TRM','TNK']
+    book_global_bd = ['tdm','tgc_local','tgc_off', 'trm','tnk']    
     
     global_res_book= pd.DataFrame()
     for i in range (len(book_global_lote)):
@@ -693,25 +816,22 @@ def var():
             global_res_book = global_res_book.append(a)
         
     #Books TGC e TML
-    ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
-    ibov['ibov'] = ibov['px_last']/ibov['px_last'].shift(1)-1 
-    ibov['val_date'] = pd.to_datetime(ibov['val_date'])
-    spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
-    spx['val_date'] = pd.to_datetime(spx['val_date'])
-    spx['spx'] = spx['px_last']/spx['px_last'].shift(1)-1 
+    ibov = recupera_bd('ibov')
+    ibov['ibov'] = ibov['IBOV Index']/ibov['IBOV Index'].shift(1)-1 
+    spx = recupera_bd('spx')
+    spx['spx'] = spx['SPX Index']/spx['SPX Index'].shift(1)-1 
     
     pct_tgc_off = 0.10
-    #pct_tgc_on = 0.03
+    pct_tgc_on = 0.03
     pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
     pl_geral = pl_fundos[pl_fundos['trading_desk'] == 'rgm'].iloc[0]['position_close']
     
     # leitura de dados
-    '''
     tgc_on_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
     tgc_on_quali = tgc_on_quali.rename(columns={'Date':'val_date'})
     tgc_on_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
     tgc_on_geral = tgc_on_geral.rename(columns={'Date':'val_date'})
-    '''
+    
     tgc_off_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_off_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
     tgc_off_quali = tgc_off_quali.rename(columns={'Date':'val_date'})
     tgc_off_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_off_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
@@ -728,7 +848,7 @@ def var():
     tgc_off_geral['dif_off_spx'] = tgc_off_geral['spx'] - tgc_off_geral['aux']
     tgc_off_geral = tgc_off_geral[['val_date','dif_off_spx']].fillna(0)
     tgc_off_geral = tgc_off_geral.rename(columns = {'dif_off_spx':'total_var'})
-    '''
+    
     #ajustes on
     tgc_on_quali['aux'] = (tgc_on_quali['TotalVar']-tgc_on_quali['Total USDBRLSpot'])/(pl_quali*pct_tgc_on)   
     tgc_on_quali = tgc_on_quali.merge(ibov,how = 'left')
@@ -744,7 +864,7 @@ def var():
     #aplicando funcoes
     res_tgc_on_geral = resultados_book2(tgc_on_geral,yesterday,'rgm','te_local_ibov')
     res_tgc_on_quali = resultados_book2(tgc_on_quali,yesterday,'rgq','te_local_ibov')
-    '''
+    
     res_tgc_off_geral = resultados_book2(tgc_off_geral,yesterday,'rgm','te_off_spx')
     res_tgc_off_quali = resultados_book2(tgc_off_quali,yesterday,'rgq','te_off_spx')
     #ajustes TML quali
@@ -767,7 +887,7 @@ def var():
     
     ###########################################################################
     res_book = quali_res_book.append(geral_res_book).append(global_res_book)
-    res_book = res_book.append([res_tml_geral, res_tml_quali,res_tgc_off_geral,res_tgc_off_quali])
+    res_book = res_book.append([res_tml_geral, res_tml_quali,res_tgc_on_geral,res_tgc_on_quali,res_tgc_off_geral,res_tgc_off_quali])
     res_book = res_book.sort_values('trading_desk')
     ###########################################################################
     #Ajustes
@@ -1167,7 +1287,7 @@ def var():
     to_alchemy_append_n(res_fundo,'resultados')
     to_alchemy_append_n(res_estrat_final,'resultados_estrategia')
     to_alchemy_append_n(prop_final,'proporcao')
-    print(res_estrat_final)
+    
     print ('Risco OK.')
     return(res_estrat_final)
 
@@ -1588,6 +1708,7 @@ def perf_attrib():
     print('Performance Attribution OK.')
     return (pnl_final)
 
+
 def tgc_off():
 
     yesterday_arq = yesterday.strftime("%Y%m%d")
@@ -1656,16 +1777,11 @@ def tgc_off():
         resultados = pd.DataFrame([[data,fundo,book,'te_equities',vol_24,vol_60,vol_ewma,es_pct,var_1pct]],columns=['val_date','trading_desk','estrategia','tipo','vol_24_meses','vol_60_meses','vol_ewma','es_21du','var_1du'])
         return(resultados)  
       
-
-    
-    #Books TGC 
-
-    ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
-    ibov['ibov'] = ibov['px_last']/ibov['px_last'].shift(1)-1 
-    ibov['val_date'] = pd.to_datetime(ibov['val_date'])
-    spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
-    spx['val_date'] = pd.to_datetime(spx['val_date'])
-    spx['spx'] = spx['px_last']/spx['px_last'].shift(1)-1 
+    #Books TGC e TML
+    ibov = recupera_bd('ibov')
+    ibov['ibov'] = ibov['IBOV Index']/ibov['IBOV Index'].shift(1)-1 
+    spx = recupera_bd('spx')
+    spx['spx'] = spx['SPX Index']/spx['SPX Index'].shift(1)-1 
     
     pct_tgc_off = 0.10
     pct_tgc_on = 0.03
