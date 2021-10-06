@@ -364,6 +364,13 @@ bd4 = bd4[bd4['ESG'] == 'N']
 bd5 = bd4[bd4['VL_PATRIM_LIQ_x'] > 10000000]
 bd5 = bd5.append(bd_esg)
 ################################## matriz correl##############################
+spx = recupera_bd("SELECT * FROM precos where ticker = 'SPX Index'")
+spx['ret_cdimais_1'] = spx['px_last']/spx['px_last'].shift(1)-1 
+spx['nome_resumido']='S&P'
+spx['CNPJ_FUNDO']='S&P'
+spx = spx.rename(columns={'val_date':'DT_COMPTC'})
+spx = spx[['DT_COMPTC','nome_resumido','ret_cdimais_1']].sort_values('DT_COMPTC',ascending=False).head(300)
+
 bd_flag_ship = bd5[bd5['flag_ship']=='S']
 bd_flag_ship2 = bd_flag_ship.merge(flag_ships,on='CNPJ_FUNDO')
 bd_flag_ship2 = bd_flag_ship2 [['DT_COMPTC','CNPJ_FUNDO','DENOM_SOCIAL_y','nome_resumido','tipo_concorrente','ret_cdimais_1']]
@@ -374,6 +381,8 @@ mercado = bd_flag_ship3.groupby("DT_COMPTC")["DT_COMPTC","ret_cdimais_1"].transf
 mercado['nome_resumido'] = 'mercado'
 mercado= mercado[['DT_COMPTC','nome_resumido','ret_cdimais_1']]
 bd_flag_ship3 = bd_flag_ship3.append(mercado)
+bd_flag_ship3['DT_COMPTC'] = bd_flag_ship3['DT_COMPTC'].dt.date
+bd_flag_ship3 = bd_flag_ship3.append(spx)
 
 bd_flag_ship4 = bd_flag_ship3.pivot_table(values='ret_cdimais_1', index = bd_flag_ship3.DT_COMPTC,columns= 'nome_resumido',aggfunc='first').reset_index()
 
@@ -406,14 +415,18 @@ corr_252 ['janela'] = '252du'
 
 matriz_final = corr_21.append([corr_63,corr_126,corr_252])
 matriz_final = matriz_final.rename(columns={'level_0':'nome_resumido2',0:'correl'})
+
 flag_ships = flag_ships.append(pd.DataFrame([['mercado','mercado','mercado','mercado','mercado',27]],
                                columns=['CNPJ_FUNDO','DENOM_SOCIAL','GESTOR','nome_resumido','tipo_concorrente','sort']))
+flag_ships = flag_ships.append(pd.DataFrame([['S&P','S&P','S&P','S&P','S&P',28]],
+                               columns=['CNPJ_FUNDO','DENOM_SOCIAL','GESTOR','nome_resumido','tipo_concorrente','sort']))
+
 matriz_final= matriz_final.merge(flag_ships,left_on = 'nome_resumido2',right_on = 'nome_resumido').drop_duplicates()
 matriz_final = matriz_final.drop(columns=['nome_resumido_y'])
 matriz_final = matriz_final.rename(columns={'nome_resumido_x':'nome_resumido'})
 data_base = bd_flag_ship4['DT_COMPTC'].sort_values().tail(1).reset_index()
 data_base = data_base.iloc[0]['DT_COMPTC']
-data_base  = data_base.date()
+#data_base  = data_base.date()
 matriz_final ['data_base'] = data_base  
 
 
@@ -681,10 +694,10 @@ resultado1 = resultado1.drop(['DT_COMPTC_y'], axis=1)
 #scores
 hoje2 = hoje.date()
 scores = pd.DataFrame([[result1_126, result1_63, hoje2]], columns = ['126_du','63_du','val_date'])
-
+'''
 ##############################################################################
 #------------------------------Subindo no BD-----------------------------------
-
+'''
 inicio = time.time()
     
 threading.Thread(target=to_alchemy(betas_21e63,'betas_concorrencia','replace','ltsurumaki')).start()
