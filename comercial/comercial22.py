@@ -198,9 +198,8 @@ bd2['ret_ytd'] = bd2.groupby('CNPJ_FUNDO')['VL_QUOTA'].transform(lambda x: x.pct
 
 bd2.sort_values(by=['CNPJ_FUNDO','DT_COMPTC'])
 
-cdi = recupera_bd('cdi')
-cdi = cdi.rename(columns={'val_date':'DT_COMPTC'})
-cdi ['DT_COMPTC'] = cdi ['DT_COMPTC'].dt.date 
+cdi = recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='BZACCETP Index'")
+cdi = cdi.rename(columns={'val_date':'DT_COMPTC','px_last':'BZACCETP Index'})
 cdi ['DT_COMPTC'] = cdi['DT_COMPTC'].astype(str)
 #cdi = cdi.drop(['Unnamed: 0'], axis=1)
 
@@ -440,30 +439,37 @@ bd5.reset_index()
 
 #-------------------------- leitura dos benchmarks ---------------------------
 
-ibov = recupera_bd('ibov')
-
+ibov = recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='IBOV Index'")
+ibov = ibov.rename(columns={'px_last':'IBOV Index'})
 ibov['ret_ibov_1'] = ibov['IBOV Index']/ibov['IBOV Index'].shift(1)-1 
 
-sptr = recupera_bd('sptr')
+sptr = recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='SPTR500N Index'")
+sptr= sptr.rename(columns={'px_last':'SPTR500N Index'})
 sptr['ret_sptr_1'] = sptr['SPTR500N Index']/sptr['SPTR500N Index'].shift(1)-1 
 
-dolar_real = recupera_bd('dolar_real')
+dolar_real = recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='USDBRL REGN Curncy'")
+dolar_real= dolar_real.rename(columns={'px_last':'USDBRL REGN Curncy'})
 dolar_real['ret_dolar_real_1'] = dolar_real['USDBRL REGN Curncy']/dolar_real['USDBRL REGN Curncy'].shift(1)-1 
 
-dxy = recupera_bd('dxy')
+dxy = recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='DXY Curncy'")
+dxy= dxy.rename(columns={'px_last':'DXY Curncy'})
 dxy['ret_dxy_1'] = dxy['DXY Curncy']/dxy['DXY Curncy'].shift(1)-1 
 
-ten_yr_treasury = recupera_bd('ten_yr_treasury')
+ten_yr_treasury = recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='USGG10YR Index'")
+ten_yr_treasury = ten_yr_treasury.rename(columns={'px_last':'USGG10YR Index'})
 ten_yr_treasury['ret_10yr_treas_1'] = (ten_yr_treasury['USGG10YR Index']-ten_yr_treasury['USGG10YR Index'].shift(1))*10/100
 
-pre_3_anos =recupera_bd('pre_3_anos')
+pre_3_anos =recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='BZAD3Y Index'")
+pre_3_anos = pre_3_anos.rename(columns={'px_last':'BZAD3Y Index'})
 pre_3_anos['ret_pre_3a_1'] = (pre_3_anos['BZAD3Y Index']-pre_3_anos['BZAD3Y Index'].shift(1))*3/100
 
-mxcn =recupera_bd('mxcn')
+mxcn =recupera_bd("SELECT val_date,px_last FROM precos WHERE ticker='MXCN Index'")
+mxcn = mxcn.rename(columns={'px_last':'MXCN Index'})
 mxcn['ret_mxcn_1'] = (mxcn['MXCN Index']/mxcn['MXCN Index'].shift(1))-1
 
 
 benchmarks = ibov.merge(sptr,how = 'outer').merge(dolar_real,how = 'outer').merge(dxy,how='outer').merge(ten_yr_treasury,how='outer').merge(pre_3_anos,how='outer').merge(mxcn,how='outer')
+benchmarks['val_date'] = pd.to_datetime(benchmarks['val_date'])
 benchmarks = benchmarks[['val_date','ret_ibov_1','ret_sptr_1','ret_dolar_real_1','ret_dxy_1','ret_10yr_treas_1','ret_pre_3a_1','ret_mxcn_1']]
 inicio_base =  dt.datetime(2017,1,1)
 benchmarks = benchmarks[benchmarks['val_date']>inicio_base] 
@@ -699,12 +705,13 @@ scores = pd.DataFrame([[result1_126, result1_63, hoje2]], columns = ['126_du','6
 #------------------------------Subindo no BD-----------------------------------
 '''
 inicio = time.time()
-    
+
 threading.Thread(target=to_alchemy(betas_21e63,'betas_concorrencia','replace','ltsurumaki')).start()
 threading.Thread(target=to_alchemy(bd5,'concorrencia','replace','rloures')).start()
 threading.Thread(target=to_alchemy(resultado1,'modelo_concorrencia','append','rloures')).start()
 threading.Thread(target=to_alchemy(scores,'scores_modelo_concorrencia','append','rloures')).start()
 threading.Thread(target=to_alchemy(matriz_final,'concorrencia_matriz_correl','replace','ltsurumaki')).start()
+
 fim = time.time()
 tempo = round((fim - inicio)/60, 1)
 mens = "Concorrencia subiu em " + str(tempo) +'m!!'
