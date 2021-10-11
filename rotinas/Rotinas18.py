@@ -422,13 +422,12 @@ def var():
     
     def resultados_book(df,data,fundo,book):
         pct = {
-            'tdd': 0.1,
-            'tdm': 0.60,
-            'tgc_local': 0.06,
-            'tgc_off': 0.20,
-            'trm': 0.05,
-            'tml': 0.1,
-            'tnk':0.1
+            'top_picks_tendencias':0.05,
+            'tdm':0.40,
+            'tgc_off': 0.15, 
+            'trm':0.10,
+            'macro':0.25,
+            'quant':0.05
             }    
         df = df.sort_values('val_date')
         PL = pl_fundos[pl_fundos['trading_desk']==fundo].iloc[0]['position_close']
@@ -652,8 +651,11 @@ def var():
     final = resultados_book(novo,yesterday,'rgm','tdm')
         
     
-    book_lote = ['TDD','TDM','TGC LOCAL','TGC OFF', 'TRM','TNK']
-    book_bd = ['tdd','tdm','tgc_local','tgc_off', 'trm','tnk']
+    #book_lote = ['TDD','TDM','TGC OFF','TRM','TNK']
+    #book_bd = ['tdd','tdm','tgc_off', 'trm','tnk']
+    
+    book_lote = ['TOP PICKS TENDENCIAS','TDM','TGC OFF','TRM','MACRO_O3','QUANT']
+    book_bd = ['top_picks_tendencias','tdm','tgc_off', 'trm','macro','quant']
     
     def filtro_book(df,book,book2,fundo):
         novo = df[df['Book'].str.contains(book)]
@@ -681,8 +683,8 @@ def var():
         else:
             geral_res_book = geral_res_book.append(a)
         
-    book_global_lote = ['TDM','TGC OFF', 'TRM','TNK']
-    book_global_bd = ['tdm','tgc_off', 'trm','tnk']    
+    book_global_lote = ['TDM','TGC OFF', 'TRM','MACRO_O3','TOP PICKS TENDENCIAS']
+    book_global_bd = ['tdm','tgc_off', 'trm','macro','top_picks_tendencias']    
     
     global_res_book= pd.DataFrame()
     for i in range (len(book_global_lote)):
@@ -692,15 +694,18 @@ def var():
         else:
             global_res_book = global_res_book.append(a)
         
-    #Books TGC e TML
-    ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
-    ibov['ibov'] = ibov['px_last']/ibov['px_last'].shift(1)-1 
-    ibov['val_date'] = pd.to_datetime(ibov['val_date'])
+    #Books TGC e TOP PICKS
+    pct_tgc_off = 0.15
+    pct_top_picks = 0.05
+    
+    #ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
+    #ibov['ibov'] = ibov['px_last']/ibov['px_last'].shift(1)-1 
+    #ibov['val_date'] = pd.to_datetime(ibov['val_date'])
     spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
     spx['val_date'] = pd.to_datetime(spx['val_date'])
     spx['spx'] = spx['px_last']/spx['px_last'].shift(1)-1 
     
-    pct_tgc_off = 0.10
+    
     #pct_tgc_on = 0.03
     pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
     pl_geral = pl_fundos[pl_fundos['trading_desk'] == 'rgm'].iloc[0]['position_close']
@@ -747,6 +752,7 @@ def var():
     '''
     res_tgc_off_geral = resultados_book2(tgc_off_geral,yesterday,'rgm','te_off_spx')
     res_tgc_off_quali = resultados_book2(tgc_off_quali,yesterday,'rgq','te_off_spx')
+    '''
     #ajustes TML quali
     tml_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tml_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
     tml_usd  = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/usd_future' + '.csv',)
@@ -764,10 +770,37 @@ def var():
     
     res_tml_geral = resultados_book(tml_geral,yesterday,'rgm','tml')
     res_tml_quali = resultados_book(tml_quali,yesterday,'rgq','tml') 
+    '''
+     # leitura de dados
+    '''
+    tgc_on_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
+    tgc_on_quali = tgc_on_quali.rename(columns={'Date':'val_date'})
+    tgc_on_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
+    tgc_on_geral = tgc_on_geral.rename(columns={'Date':'val_date'})
+    '''
+    top_picks_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/top_picks_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
+    top_picks_quali = top_picks_quali.rename(columns={'Date':'val_date'})
+    top_picks_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/top_picks_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
+    top_picks_geral = top_picks_geral.rename(columns={'Date':'val_date'})
+    # ajustes off
+    top_picks_quali['aux'] = (top_picks_quali['TotalVar']-top_picks_quali['Total USDBRLSpot'])/(pl_quali*pct_top_picks)   
+    top_picks_quali = top_picks_quali.merge(spx,how = 'left')
+    top_picks_quali['dif_off_spx'] = top_picks_quali['spx'] - top_picks_quali['aux']
+    top_picks_quali = top_picks_quali[['val_date','dif_off_spx']].fillna(0)
+    top_picks_quali = top_picks_quali.rename(columns = {'dif_off_spx':'total_var'})
+    
+    top_picks_geral['aux'] = (top_picks_geral['TotalVar']-top_picks_geral['Total USDBRLSpot'])/(pl_geral*pct_top_picks)   
+    top_picks_geral = top_picks_geral.merge(spx,how = 'left')
+    top_picks_geral['dif_off_spx'] = top_picks_geral['spx'] - top_picks_geral['aux']
+    top_picks_geral = top_picks_geral[['val_date','dif_off_spx']].fillna(0)
+    top_picks_geral = top_picks_geral.rename(columns = {'dif_off_spx':'total_var'})
+    
+    res_top_picks_geral = resultados_book2(top_picks_geral,yesterday,'rgm','top_picks_te_spx')
+    res_top_picks_quali = resultados_book2(top_picks_quali,yesterday,'rgq','top_picks_te_spx')
     
     ###########################################################################
     res_book = quali_res_book.append(geral_res_book).append(global_res_book)
-    res_book = res_book.append([res_tml_geral, res_tml_quali,res_tgc_off_geral,res_tgc_off_quali])
+    res_book = res_book.append([res_tgc_off_geral,res_tgc_off_quali,res_top_picks_geral,res_top_picks_quali])
     res_book = res_book.sort_values('trading_desk')
     ###########################################################################
     #Ajustes
@@ -1167,7 +1200,6 @@ def var():
     to_alchemy_append_n(res_fundo,'resultados')
     to_alchemy_append_n(res_estrat_final,'resultados_estrategia')
     to_alchemy_append_n(prop_final,'proporcao')
-    print(res_estrat_final)
     print ('Risco OK.')
     return(res_estrat_final)
 
@@ -1254,6 +1286,25 @@ def perf_attrib():
     pnl2= pnl.append(fx_pnl_df,ignore_index=True )
     
     #------------------------------spx ibov----------------------------------------
+    
+    ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
+    ibov = ibov.drop(columns = 'ticker')
+    ibov = ibov.rename(columns = {'px_last':'IBOV Index'})
+    ibov_feriado = pd.DataFrame([[dt.datetime(2021, 7, 9),125427.8]],columns=['val_date','IBOV Index'])
+    ibov_feriado2 = pd.DataFrame([[dt.datetime(2021, 9, 7),117868.6]],columns=['val_date','IBOV Index'])
+    ibov = ibov.append([ibov_feriado,ibov_feriado2]).sort_values('val_date')
+    ibov['val_date'] = pd.to_datetime(ibov['val_date'])
+    
+    spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
+    spx = spx.drop(columns = 'ticker')
+    spx  = spx.rename(columns = {'px_last':'SPX Index'})
+    sp_feriado = pd.DataFrame([[dt.datetime(2021, 5, 31),7684.3]],columns=['val_date','SPX Index']) 
+    sp_feriado2 = pd.DataFrame([[dt.datetime(2021, 7, 5),7962.48]],columns=['val_date','SPX Index']) 
+    sp_feriado3 = pd.DataFrame([[dt.datetime(2021, 9, 6),8311.47]],columns=['val_date','SPX Index']) 
+    spx = spx.append([sp_feriado,sp_feriado2,sp_feriado3]).sort_values('val_date')
+    spx['val_date'] = pd.to_datetime(spx['val_date'])
+  
+    '''
     ibov = recupera_bd('ibov')
     ibov_feriado = pd.DataFrame([[dt.datetime(2021, 7, 9),125427.8]],columns=['val_date','IBOV Index'])
     ibov_feriado2 = pd.DataFrame([[dt.datetime(2021, 9, 7),117868.6]],columns=['val_date','IBOV Index'])
@@ -1264,7 +1315,7 @@ def perf_attrib():
     sp_feriado2 = pd.DataFrame([[dt.datetime(2021, 7, 5),7962.48]],columns=['val_date','SPX Index']) 
     sp_feriado3 = pd.DataFrame([[dt.datetime(2021, 9, 6),8311.47]],columns=['val_date','SPX Index']) 
     spx = spx.append([sp_feriado,sp_feriado2,sp_feriado3]).sort_values('val_date')
-    
+    '''
     def spx_ibov(spx,ibov,data,sem,mes,ytd1,ytd2,mtd1):
         peso_ibov = 0.03
         peso_spx = 0.10
@@ -1667,7 +1718,7 @@ def tgc_off():
     spx['val_date'] = pd.to_datetime(spx['val_date'])
     spx['spx'] = spx['px_last']/spx['px_last'].shift(1)-1 
     
-    pct_tgc_off = 0.10
+    pct_tgc_off = 0.15
     pct_tgc_on = 0.03
     
     pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
