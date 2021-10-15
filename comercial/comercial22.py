@@ -362,6 +362,7 @@ bd_esg = bd4[bd4['ESG'] == 'S']
 bd4 = bd4[bd4['ESG'] == 'N']
 bd5 = bd4[bd4['VL_PATRIM_LIQ_x'] > 10000000]
 bd5 = bd5.append(bd_esg)
+
 ################################## matriz correl##############################
 spx = recupera_bd("SELECT * FROM precos where ticker = 'SPX Index'")
 spx['ret_cdimais_1'] = spx['px_last']/spx['px_last'].shift(1)-1 
@@ -700,6 +701,12 @@ resultado1 = resultado1.drop(['DT_COMPTC_y'], axis=1)
 #scores
 hoje2 = hoje.date()
 scores = pd.DataFrame([[result1_126, result1_63, hoje2]], columns = ['126_du','63_du','val_date'])
+################################### Peers ####################################
+bd_peers = bd5.copy()
+bd_peers['DT_COMPTC'] = bd_peers['DT_COMPTC'].astype('datetime64[ns]')
+bd_peers = bd_peers.sort_values('DT_COMPTC')
+bd_peers = bd_peers[bd_peers['DT_COMPTC']==bd_peers.iloc[-1]['DT_COMPTC']]
+bd_peers['DT_COMPTC'] = bd_peers['DT_COMPTC'].dt.strftime('%Y/%m/%d')
 '''
 ##############################################################################
 #------------------------------Subindo no BD-----------------------------------
@@ -711,6 +718,7 @@ threading.Thread(target=to_alchemy(bd5,'concorrencia','replace','rloures')).star
 threading.Thread(target=to_alchemy(resultado1,'modelo_concorrencia','append','rloures')).start()
 threading.Thread(target=to_alchemy(scores,'scores_modelo_concorrencia','append','rloures')).start()
 threading.Thread(target=to_alchemy(matriz_final,'concorrencia_matriz_correl','replace','ltsurumaki')).start()
+to_alchemy(bd_peers,'concorrencia_peers','replace','rloures')
 
 fim = time.time()
 tempo = round((fim - inicio)/60, 1)
