@@ -10,7 +10,7 @@ import datetime as dt
 from pandas.tseries.offsets import BDay
 import numpy as np
 from sqlalchemy import create_engine
-
+import telegram_send
 #--------------------------------- Conexoes ---------------------------------
 
 param_dic = {
@@ -104,7 +104,6 @@ quali_fundo = quali_fundo.merge(dolar,how='left')
 quali_fundo['dolar'] = quali_fundo['dolar'].fillna(method='ffill')
 geral_fundo = quali_fundo.copy()
 
-
 #retornos
 quali_fundo['ret_fundo'] = (quali_fundo['TotalVar']*quali_fundo['dolar']*exp_quali)/pl_quali
 geral_fundo['ret_fundo'] = (geral_fundo['TotalVar']*geral_fundo['dolar']*exp_geral)/pl_geral
@@ -184,4 +183,6 @@ matriz_final['book2'] = np.where(matriz_final['book2']=='tgc','tgc_off',matriz_f
 matriz_final.to_sql('correl_books', 
               con=engine, 
               index=False, 
-              if_exists='replace')
+              if_exists='append')]
+
+telegram_send.send(messages=['Correl. Books OK!'])
