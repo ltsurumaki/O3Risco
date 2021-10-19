@@ -55,25 +55,45 @@ hbp = hbp[hbp['val_date']==yesterday]
 pl = hbp.groupby(['trading_desk','val_date']).sum().reset_index()
 pl_quali = pl[pl['trading_desk']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM'].reset_index().iloc[0]['position_close']
 pl_geral= pl[pl['trading_desk']=='O3 RETORNO GLOBAL MASTER FIM'].reset_index().iloc[0]['position_close']
-
+#books
 books_list = ['MACRO_O3','QUANT','TGC OFF','TOP PICKS TENDENCIAS','TRM']
 books_pct = pd.DataFrame([['MACRO_O3',0.25],['QUANT',0.05],['TGC OFF',0.15],['TOP PICKS TENDENCIAS',0.05],['TRM',0.10]],columns=['Book','pct'])
+#exposao
+explosao = pd.read_sql("SELECT * FROM proporcao_fundos WHERE fundo_destino='O3 RETORNO GLOBAL MASTER FIM' OR fundo_destino='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM';",con=engine2)
+explosao  = explosao [explosao ['fundo_origem']=='O3 MACRO INTERNATIONAL FUND']
+exp_quali = explosao [explosao ['fundo_destino']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+exp_geral = explosao [explosao ['fundo_destino']=='O3 RETORNO GLOBAL MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+#cambio
+dolar = pd.read_sql("SELECT val_date,px_last FROM precos WHERE ticker='USDBRL REGN Curncy'", con=engine)
+dolar ['val_date'] = pd.to_datetime(dolar ['val_date'])
+dolar = dolar.rename(columns={'px_last':'dolar','val_date':'Date'})
+                                                                                                                                                   
+quali_books = pd.read_csv('I:/Riscos/TotalVaR/historico/' + 'macro' + '_nivel2_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
 
-quali_books = pd.read_csv('I:/Riscos/TotalVaR/historico/' + 'quali' + '_nivel2_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
 quali_fundo = quali_books.drop(columns=['Book']).groupby('Date').sum().reset_index()
-quali_fundo['ret_fundo'] = quali_fundo['TotalVar']/pl_quali
-quali_fundo = quali_fundo[['Date','ret_fundo']]
-quali_books = quali_books.merge(books_pct,how='outer').dropna()
-quali_books ['ret'] = quali_books['TotalVar']/(pl_quali*quali_books['pct'])
-quali_books = quali_books[['Book','Date','ret']]  
+quali_fundo = quali_fundo.merge(dolar,how='left')
+quali_fundo['dolar'] = quali_fundo['dolar'].fillna(method='ffill')
+geral_fundo = quali_fundo.copy()
 
-geral_books = pd.read_csv('I:/Riscos/TotalVaR/historico/' + 'geral' + '_nivel2_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-geral_fundo = geral_books.drop(columns=['Book']).groupby('Date').sum().reset_index()
-geral_fundo['ret_fundo'] = geral_fundo['TotalVar']/pl_geral
+quali_fundo['ret_fundo'] = (quali_fundo['TotalVar']*quali_fundo['dolar']*exp_quali)/pl_quali
+geral_fundo['ret_fundo'] = (geral_fundo['TotalVar']*geral_fundo['dolar']*exp_geral)/pl_geral
+
+quali_fundo = quali_fundo[['Date','ret_fundo']]
 geral_fundo = geral_fundo[['Date','ret_fundo']]
-geral_books = geral_books.merge(books_pct,how='outer').dropna()
-geral_books ['ret'] = geral_books['TotalVar']/(pl_geral*geral_books['pct'])
-geral_books = geral_books[['Book','Date','ret']]
+
+quali_books = quali_books.merge(books_pct,how='outer').dropna()
+quali_books = quali_books.merge(dolar,how='left')
+quali_books['dolar'] = quali_books['dolar'].fillna(method='ffill')
+geral_books = quali_books.copy()
+
+quali_books ['ret'] = (quali_books['TotalVar']*quali_books['dolar']*exp_quali)/(pl_quali*quali_books['pct'])
+geral_books ['ret'] = (geral_books['TotalVar']*geral_books['dolar']*exp_geral)/(pl_geral*geral_books['pct'])
+
+quali_books = quali_books[['Book','Date','ret']]  
+geral_books = geral_books[['Book','Date','ret']]  
+
+
+
 
 spx = pd.read_sql("SELECT px_last,val_date FROM precos WHERE ticker='SPX Index';", con=engine)
 spx['val_date'] = pd.to_datetime(spx['val_date'])
