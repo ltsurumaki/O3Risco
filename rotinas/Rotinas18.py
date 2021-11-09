@@ -253,10 +253,17 @@ def atualiza_obs():
 #################################### Dolar ###############################
 dolar = recupera_bd('cambio')
 dolar = dolar.iloc[0][0]
+
+hist_dolar = recupera_bd("SELECT * FROM precos WHERE ticker='USDBRL REGN Curncy';")
+hist_dolar ['val_date'] = pd.to_datetime(hist_dolar ['val_date'])
+hist_dolar = hist_dolar.rename(columns={'px_last':'dolar'})
+hist_dolar = hist_dolar.drop(columns='ticker')
+hist_dolar['val_date'] = hist_dolar['val_date'].dt.date
+hist_dolar = hist_dolar[hist_dolar['val_date'] == yesterday.date()].reset_index().loc[0]['dolar']
+
 ############################ Risco de Mercado ############################
 
 def var():
-
     yesterday_2 = yesterday.strftime("%Y-%m-%d")
     yesterday_arq = yesterday.strftime("%Y%m%d")
     
@@ -336,6 +343,7 @@ def var():
     quali24_6 = le_dados('quali_param_24','6')  
     quali120 = le_dados('quali_120','6')  
     quali2 = le_dados('quali','2')  
+    macro2 = le_dados('macro','2')  
     quali60_3 = le_dados('quali_param_60','3')  
     quali24_3 = le_dados('quali_param_24','3')  
     quali120_3 = le_dados('quali_120','3') 
@@ -419,16 +427,16 @@ def var():
         stress = abs(df_stress.iloc[0]['TotalStress'])/PL
         resultados = pd.DataFrame([[data,fundo,vol_24,vol_60,vol_ewma,var_1pct,es_pct,stress,es_sup]],columns=['val_date','trading_desk','vol_24_meses','vol_60_meses','vol_ewma','var_1du','es_21du','stress_test','cauda_sup_21du'])
         return(resultados)  
-    
+    pct = {
+        'top_picks_tendencias':0.05,
+        'tdm':0.40,
+        'tgc_off': 0.15, 
+        'trm':0.10,
+        'macro':0.25,
+        'quant':0.05
+        }
     def resultados_book(df,data,fundo,book):
-        pct = {
-            'top_picks_tendencias':0.05,
-            'tdm':0.40,
-            'tgc_off': 0.15, 
-            'trm':0.10,
-            'macro':0.25,
-            'quant':0.05
-            }    
+        
         df = df.sort_values('val_date')
         PL = pl_fundos[pl_fundos['trading_desk']==fundo].iloc[0]['position_close']
         vol_24 = abs(np.std(df['total_var'].tail(504))*math.sqrt(252))/(PL*pct[book])
@@ -448,6 +456,26 @@ def var():
         vol_ewma = abs(vol_ewma.iloc[0][0]/(PL*pct[book]))
         resultados = pd.DataFrame([[data,fundo,book,'book',vol_24,vol_60,vol_ewma,es_pct,var_1pct]],columns=['val_date','trading_desk','estrategia','tipo','vol_24_meses','vol_60_meses','vol_ewma','es_21du','var_1du'])
         return(resultados)  
+    def resultados_book3(df,data,fundo,book):
+        df = df.sort_values('val_date')
+        vol_24 = abs(np.std(df['total_var'].tail(504))*math.sqrt(252))
+        vol_60 = abs(np.std(df['total_var'].tail(1260))*math.sqrt(252))
+        percentil = np.percentile(df['total_var'],1)
+        var_1pct = abs(percentil)
+        filtro_es = df[df['total_var']<percentil]
+        es_pct = abs(np.mean(filtro_es['total_var'])*math.sqrt(21))
+        ewma = list()
+        ewma.append(0)
+        tv = list(df['total_var'])
+        for i in range(1,len(df)):
+            ewma_nova =math.sqrt( 0.94*ewma[i-1]*ewma[i-1]+(1-0.94)*tv[i]*tv[i])
+            ewma.append(ewma_nova)
+        ewma_ano = pd.DataFrame(ewma)*math.sqrt(252)
+        vol_ewma = ewma_ano.tail(1)
+        vol_ewma = abs(vol_ewma.iloc[0][0])
+        resultados = pd.DataFrame([[data,fundo,book,'book',vol_24,vol_60,vol_ewma,es_pct,var_1pct]],columns=['val_date','trading_desk','estrategia','tipo','vol_24_meses','vol_60_meses','vol_ewma','es_21du','var_1du'])
+        return(resultados)  
+    
     def resultados_book2(df,data,fundo,book):   
         df = df.sort_values('val_date')
         vol_24 = abs(np.std(df['total_var'].tail(504))*math.sqrt(252))
@@ -649,13 +677,81 @@ def var():
     novo = geral2[geral2['Book'].str.contains('TDM')]
     novo = novo.drop(columns=['Book']).groupby('val_date').sum()
     final = resultados_book(novo,yesterday,'rgm','tdm')
-        
+    df_pct = pd.DataFrame(pct.items(),columns=['Book','pct_book'])
     
     #book_lote = ['TDD','TDM','TGC OFF','TRM','TNK']
     #book_bd = ['tdd','tdm','tgc_off', 'trm','tnk']
     
+    
     book_lote = ['TOP PICKS TENDENCIAS','TDM','TGC OFF','TRM','MACRO_O3','QUANT']
     book_bd = ['top_picks_tendencias','tdm','tgc_off', 'trm','macro','quant']
+    
+    pl_quali = pl_fundos.loc[pl_fundos['trading_desk'] == 'rgq', 'position_close'].iloc[0]
+    pl_geral = pl_fundos.loc[pl_fundos['trading_desk'] == 'rgm', 'position_close'].iloc[0]
+    #ONSHORE
+    dic_loc_off = {'MACRO_O3 LOCAL':'macro','QUANT LOCAL':'quant'}
+    quali_book_loc = quali2[quali2['Book'].str.contains('LOCAL')]
+    quali_book_loc = quali_book_loc.replace({'Book': dic_loc_off})
+    quali_book_loc = quali_book_loc.merge(df_pct,how='left')
+    quali_book_loc['total_var'] = quali_book_loc['total_var']/(quali_book_loc['pct_book']*pl_quali)
+    quali_book_loc = quali_book_loc.drop(columns='pct_book')
+    
+    geral_book_loc = geral2[geral2['Book'].str.contains('LOCAL')]
+    geral_book_loc = geral_book_loc.replace({'Book': dic_loc_off})
+    geral_book_loc = geral_book_loc.merge(df_pct,how='left')
+    geral_book_loc['total_var'] = geral_book_loc['total_var']/(geral_book_loc['pct_book']*pl_geral)
+    geral_book_loc = geral_book_loc.drop(columns='pct_book')
+    
+    #OFFSHORE
+    explosao = recupera_bd2("SELECT * FROM proporcao_fundos WHERE fundo_destino='O3 RETORNO GLOBAL MASTER FIM' OR fundo_destino='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM';")
+    explosao_oz = explosao [explosao ['fundo_origem']=='O3 OZEIN GLOBAL FUND']
+    explosao  = explosao [explosao ['fundo_origem']=='O3 MACRO INTERNATIONAL FUND']
+    
+    
+    exp_quali = explosao [explosao ['fundo_destino']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+    exp_geral = explosao [explosao ['fundo_destino']=='O3 RETORNO GLOBAL MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+    exp_quali_oz = explosao_oz [explosao_oz ['fundo_destino']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+    exp_geral_oz = explosao_oz [explosao_oz ['fundo_destino']=='O3 RETORNO GLOBAL MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+    
+    dic_off = {'MACRO_O3 OFF':'macro','QUANT OFF':'quant','TGC OFF':'tgc_off','TOP PICKS TENDENCIAS':'top_picks_tendencias','TDM':'tdm','TRM':'trm'}
+    
+    macro2 = macro2.replace({'Book': dic_off})
+    macro2 = macro2.merge(df_pct,how='left')
+    macro2 = macro2.sort_values('val_date')
+    macro2['total_var_quali'] = (hist_dolar*macro2 ['total_var']*exp_quali)/(macro2 ['pct_book']*pl_quali)
+    macro2['total_var_geral'] = (hist_dolar*macro2 ['total_var']*exp_geral)/(macro2 ['pct_book']*pl_geral)
+    
+    macro_quali = macro2[['Book','val_date','total_var_quali']]
+    macro_quali = macro_quali.rename(columns={'total_var_quali':'total_var'})
+    macro_quali2 = macro_quali.merge(quali_book_loc,right_on=['val_date','Book'],left_on=['val_date','Book'],how = 'left')
+    macro_quali2['total_var_y'] = macro_quali2['total_var_y'].fillna(0)
+    macro_quali2['total_var'] = macro_quali2['total_var_x'] + macro_quali2['total_var_y']  
+    macro_quali2 = macro_quali2.drop(columns=['total_var_x','total_var_y'])
+    
+    macro_geral = macro2[['Book','val_date','total_var_geral']]
+    macro_geral = macro_geral.rename(columns={'total_var_geral':'total_var'})
+    macro_geral2 = macro_geral.merge(geral_book_loc,right_on=['val_date','Book'],left_on=['val_date','Book'],how = 'left')
+    macro_geral2['total_var_y'] = macro_geral2['total_var_y'].fillna(0)
+    macro_geral2['total_var'] = macro_geral2['total_var_x'] + macro_geral2['total_var_y']  
+    macro_geral2 = macro_geral2.drop(columns=['total_var_x','total_var_y'])
+    
+    #OZEIN--TRM
+    ozein = pd.read_csv('I:/Riscos/TotalVaR/historico/' + 'multi2' + '_nivel2_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
+    ozein ['Book'] ='trm'
+    ozein = ozein.rename(columns={'Date':'val_date'}) 
+    ozein ['val_date'] = ozein ['val_date'].dt.date
+    ozein = ozein.merge(df_pct,how='outer').dropna()
+    
+    quali_ozein = ozein.copy() 
+    quali_ozein ['total_var'] = (quali_ozein['TotalVar']*hist_dolar*exp_quali_oz)/(pl_quali*pct['trm'])
+    geral_ozein = ozein.copy() 
+    geral_ozein ['total_var'] = (geral_ozein['TotalVar']*hist_dolar*exp_geral_oz)/(pl_geral*pct['trm'])
+    
+    quali_ozein = quali_ozein [['Book','val_date','total_var']] 
+    geral_ozein = geral_ozein [['Book','val_date','total_var']] 
+    
+    macro_quali2 = macro_quali2.append(quali_ozein)
+    macro_geral2 = macro_geral2.append(geral_ozein)
     
     def filtro_book(df,book,book2,fundo):
         novo = df[df['Book'].str.contains(book)]
@@ -663,10 +759,26 @@ def var():
         if len(novo) == 0:
             final = pd.DataFrame()
         else:    
-            final = resultados_book(novo,yesterday,fundo,book2)
+            final = resultados_book3(novo,yesterday,fundo,book2)
         return(final)
     
+    quali_res_book= pd.DataFrame()
+    for i in range (len(book_lote)):
+        a = filtro_book(macro_quali2,book_bd[i],book_bd[i],'rgq')
+        if len(a) == 0:
+            pass
+        else:
+            quali_res_book = quali_res_book.append(a)
     
+    geral_res_book= pd.DataFrame()
+    for i in range (len(book_lote)):
+        a = filtro_book(macro_geral2,book_bd[i],book_bd[i],'rgm')
+        if len(a) == 0:
+            pass
+        else:
+            geral_res_book = geral_res_book.append(a)
+    
+    '''
     quali_res_book= pd.DataFrame()
     for i in range (len(book_lote)):
         a = filtro_book(quali2,book_lote[i],book_bd[i],'rgq')
@@ -682,6 +794,7 @@ def var():
             pass
         else:
             geral_res_book = geral_res_book.append(a)
+    '''
         
     book_global_lote = ['TDM','TGC OFF', 'TRM','MACRO_O3','TOP PICKS TENDENCIAS']
     book_global_bd = ['tdm','tgc_off', 'trm','macro','top_picks_tendencias']    
@@ -707,8 +820,8 @@ def var():
     
     
     #pct_tgc_on = 0.03
-    pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
-    pl_geral = pl_fundos[pl_fundos['trading_desk'] == 'rgm'].iloc[0]['position_close']
+    #pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
+    #pl_geral = pl_fundos[pl_fundos['trading_desk'] == 'rgm'].iloc[0]['position_close']
     
     # leitura de dados
     '''
@@ -752,25 +865,7 @@ def var():
     '''
     res_tgc_off_geral = resultados_book2(tgc_off_geral,yesterday,'rgm','te_off_spx')
     res_tgc_off_quali = resultados_book2(tgc_off_quali,yesterday,'rgq','te_off_spx')
-    '''
-    #ajustes TML quali
-    tml_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tml_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    tml_usd  = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/usd_future' + '.csv',)
-    raz_quali = tml_usd.iloc[0]['usd_future']/tml_usd.iloc[0]['total']
-    tml_quali['total_var'] = tml_quali['TotalVar']-(tml_quali['Total USDBRLSpot']*(1-raz_quali))
-    tml_quali['trading_desk'] = 'tml'
-    tml_quali = tml_quali.rename(columns={'Date':'val_date'})
-    #ajustes TML geral
-    tml_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tml_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    tml_usd  = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/usd_future' + '.csv',)
-    raz_geral = tml_usd.iloc[1]['usd_future']/tml_usd.iloc[1]['total']
-    tml_geral['total_var'] = tml_geral['TotalVar']-(tml_geral['Total USDBRLSpot']*(1-raz_geral))
-    tml_geral['trading_desk'] = 'tml'
-    tml_geral = tml_geral.rename(columns={'Date':'val_date'})
     
-    res_tml_geral = resultados_book(tml_geral,yesterday,'rgm','tml')
-    res_tml_quali = resultados_book(tml_quali,yesterday,'rgq','tml') 
-    '''
      # leitura de dados
     '''
     tgc_on_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
@@ -1191,12 +1286,12 @@ def var():
         size.append(dic_tamanhos[i])
         
     nx.draw(G,with_labels=True,node_color='#a1a8ad', font_color="#26262b",width=10,font_weight="bold",node_size = size,edgecolors='#a1a8ad', linewidths=3, font_size=75,edge_color = links_filtered['cor'],alpha=0.9,pos=pos)
-
+    
     fig.set_facecolor("#e7edee")
     
     fig.savefig(r'I:\Riscos\Grafos\grafo2'+ yesterday_2 +'.jpg')
     #----------------------------- Subindo no BD-------------------------------
-
+    
     to_alchemy_append_n(res_fundo,'resultados')
     to_alchemy_append_n(res_estrat_final,'resultados_estrategia')
     to_alchemy_append_n(prop_final,'proporcao')
@@ -1292,7 +1387,10 @@ def perf_attrib():
     ibov = ibov.rename(columns = {'px_last':'IBOV Index'})
     ibov_feriado = pd.DataFrame([[dt.datetime(2021, 7, 9),125427.8]],columns=['val_date','IBOV Index'])
     ibov_feriado2 = pd.DataFrame([[dt.datetime(2021, 9, 7),117868.6]],columns=['val_date','IBOV Index'])
-    ibov = ibov.append([ibov_feriado,ibov_feriado2]).sort_values('val_date')
+    ibov_feriado3 = pd.DataFrame([[dt.datetime(2021, 10, 12),112180.00]],columns=['val_date','IBOV Index'])
+    ibov_feriado4 = pd.DataFrame([[dt.datetime(2021, 11, 2),105551.00]],columns=['val_date','IBOV Index'])
+    
+    ibov = ibov.append([ibov_feriado,ibov_feriado2,ibov_feriado3]).sort_values('val_date')
     ibov['val_date'] = pd.to_datetime(ibov['val_date'])
     
     spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
@@ -1764,10 +1862,9 @@ def tgc_off():
     tgc_off_quali ['rolling_sharpe_12m'] = tgc_off_quali ['rolling_ret_12m']/tgc_off_quali ['rolling_vol_12m']
     
     
-    ten_year = pd.read_csv('I:/Riscos/Maxdrawdown/10yr_treasury.csv')
-    ten_year.columns = ['val_date','10_yr_index']
+    ten_year = recupera_bd("SELECT val_date,px_last FROM precos where ticker='USGG10YR Index'")
     ten_year['val_date'] = pd.to_datetime(ten_year['val_date']) 
-    ten_year['10_yr_returns'] =  ten_year['10_yr_index']-ten_year['10_yr_index'].shift(1)
+    ten_year['10_yr_returns'] =  ten_year['px_last']-ten_year['px_last'].shift(1)
     tgc_off_quali = tgc_off_quali.merge(ten_year)
     
     tgc_off_quali['cor_10yr_treas_1m'] = tgc_off_quali['total_var'].rolling(21).corr(tgc_off_quali['10_yr_returns'])
@@ -1776,10 +1873,7 @@ def tgc_off():
     tgc_off_quali['ret_acumulado'] = (tgc_off_quali['total_var']+1).cumprod() -1
     tgc_off_quali = tgc_off_quali.rename(columns = {'total_var':'retorno_tgc'})
     
-    
-    to_alchemy_replace(tgc_off_quali,'tgc_off_rolling')
     to_alchemy_replace_n(tgc_off_quali,'tgc_off_rolling')
-
     print ('Backtest TGC Off Ok!')
     return(0)
 
@@ -1791,7 +1885,6 @@ class janela:
         self.fr1.pack()
         self.lb1 = Label(self.fr1,text = 'Rotinas da Manhã',font=('bold'),bg='white',height = 1, width = 20)
         self.lb1.pack()
-
         self.b15 = Button(self.fr1,text = 'Atualizar Cambio',command = atualiza_cambio,height = 1, width = 20)
         self.b15.pack()
         self.b12 = Button(self.fr1,text = 'Atualizar Fatores',command = atualiza_fatores,height = 1, width = 20)
