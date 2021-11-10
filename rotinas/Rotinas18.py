@@ -778,23 +778,6 @@ def var():
         else:
             geral_res_book = geral_res_book.append(a)
     
-    '''
-    quali_res_book= pd.DataFrame()
-    for i in range (len(book_lote)):
-        a = filtro_book(quali2,book_lote[i],book_bd[i],'rgq')
-        if len(a) == 0:
-            pass
-        else:
-            quali_res_book = quali_res_book.append(a)
-    
-    geral_res_book= pd.DataFrame()
-    for i in range (len(book_lote)):
-        a = filtro_book(geral2,book_lote[i],book_bd[i],'rgm')
-        if len(a) == 0:
-            pass
-        else:
-            geral_res_book = geral_res_book.append(a)
-    '''
         
     book_global_lote = ['TDM','TGC OFF', 'TRM','MACRO_O3','TOP PICKS TENDENCIAS']
     book_global_bd = ['tdm','tgc_off', 'trm','macro','top_picks_tendencias']    
@@ -806,22 +789,16 @@ def var():
             pass
         else:
             global_res_book = global_res_book.append(a)
-        
-    #Books TGC e TOP PICKS
-    pct_tgc_off = 0.15
-    pct_top_picks = 0.05
+
+    #Trekig error
     
     #ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
     #ibov['ibov'] = ibov['px_last']/ibov['px_last'].shift(1)-1 
     #ibov['val_date'] = pd.to_datetime(ibov['val_date'])
     spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
     spx['val_date'] = pd.to_datetime(spx['val_date'])
+    spx['val_date'] = spx['val_date'].dt.date
     spx['spx'] = spx['px_last']/spx['px_last'].shift(1)-1 
-    
-    
-    #pct_tgc_on = 0.03
-    #pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
-    #pl_geral = pl_fundos[pl_fundos['trading_desk'] == 'rgm'].iloc[0]['position_close']
     
     # leitura de dados
     '''
@@ -830,18 +807,16 @@ def var():
     tgc_on_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
     tgc_on_geral = tgc_on_geral.rename(columns={'Date':'val_date'})
     '''
-    tgc_off_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_off_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    tgc_off_quali = tgc_off_quali.rename(columns={'Date':'val_date'})
-    tgc_off_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_off_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    tgc_off_geral = tgc_off_geral.rename(columns={'Date':'val_date'})
+    tgc_off_quali = macro_quali2[macro_quali2['Book'] == 'tgc_off']
+    tgc_off_geral = macro_geral2[macro_quali2['Book'] == 'tgc_off']
     # ajustes off
-    tgc_off_quali['aux'] = (tgc_off_quali['TotalVar']-tgc_off_quali['Total USDBRLSpot'])/(pl_quali*pct_tgc_off)   
+    tgc_off_quali = tgc_off_quali.rename(columns={'total_var':'aux'})
     tgc_off_quali = tgc_off_quali.merge(spx,how = 'left')
     tgc_off_quali['dif_off_spx'] = tgc_off_quali['spx'] - tgc_off_quali['aux']
     tgc_off_quali = tgc_off_quali[['val_date','dif_off_spx']].fillna(0)
     tgc_off_quali = tgc_off_quali.rename(columns = {'dif_off_spx':'total_var'})
     
-    tgc_off_geral['aux'] = (tgc_off_geral['TotalVar']-tgc_off_geral['Total USDBRLSpot'])/(pl_geral*pct_tgc_off)   
+    tgc_off_geral= tgc_off_geral.rename(columns={'total_var':'aux'})
     tgc_off_geral = tgc_off_geral.merge(spx,how = 'left')
     tgc_off_geral['dif_off_spx'] = tgc_off_geral['spx'] - tgc_off_geral['aux']
     tgc_off_geral = tgc_off_geral[['val_date','dif_off_spx']].fillna(0)
@@ -865,7 +840,6 @@ def var():
     '''
     res_tgc_off_geral = resultados_book2(tgc_off_geral,yesterday,'rgm','te_off_spx')
     res_tgc_off_quali = resultados_book2(tgc_off_quali,yesterday,'rgq','te_off_spx')
-    
      # leitura de dados
     '''
     tgc_on_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
@@ -873,18 +847,16 @@ def var():
     tgc_on_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_on_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
     tgc_on_geral = tgc_on_geral.rename(columns={'Date':'val_date'})
     '''
-    top_picks_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/top_picks_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    top_picks_quali = top_picks_quali.rename(columns={'Date':'val_date'})
-    top_picks_geral = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/top_picks_geral_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    top_picks_geral = top_picks_geral.rename(columns={'Date':'val_date'})
+    top_picks_quali = macro_quali2[macro_quali2['Book'] == 'top_picks_tendencias']
+    top_picks_geral = macro_geral2[macro_geral2['Book'] == 'top_picks_tendencias']
     # ajustes off
-    top_picks_quali['aux'] = (top_picks_quali['TotalVar']-top_picks_quali['Total USDBRLSpot'])/(pl_quali*pct_top_picks)   
+    top_picks_quali = top_picks_quali.rename(columns={'total_var':'aux'})
     top_picks_quali = top_picks_quali.merge(spx,how = 'left')
     top_picks_quali['dif_off_spx'] = top_picks_quali['spx'] - top_picks_quali['aux']
     top_picks_quali = top_picks_quali[['val_date','dif_off_spx']].fillna(0)
     top_picks_quali = top_picks_quali.rename(columns = {'dif_off_spx':'total_var'})
     
-    top_picks_geral['aux'] = (top_picks_geral['TotalVar']-top_picks_geral['Total USDBRLSpot'])/(pl_geral*pct_top_picks)   
+    top_picks_geral = top_picks_geral.rename(columns={'total_var':'aux'})
     top_picks_geral = top_picks_geral.merge(spx,how = 'left')
     top_picks_geral['dif_off_spx'] = top_picks_geral['spx'] - top_picks_geral['aux']
     top_picks_geral = top_picks_geral[['val_date','dif_off_spx']].fillna(0)
@@ -892,7 +864,7 @@ def var():
     
     res_top_picks_geral = resultados_book2(top_picks_geral,yesterday,'rgm','top_picks_te_spx')
     res_top_picks_quali = resultados_book2(top_picks_quali,yesterday,'rgq','top_picks_te_spx')
-    
+
     ###########################################################################
     res_book = quali_res_book.append(geral_res_book).append(global_res_book)
     res_book = res_book.append([res_tgc_off_geral,res_tgc_off_quali,res_top_picks_geral,res_top_picks_quali])
@@ -902,8 +874,7 @@ def var():
     res_fundo = res_fundo[['val_date','trading_desk','vol_24_meses','vol_60_meses','vol_ewma','var_1du','es_21du','vol_realizada_126du','stress_test','cauda_sup_21du']]
     res_fundo['val_date'] = res_fundo['val_date'].dt.date
     res_book['val_date'] = res_book['val_date'].dt.date
-    res_estrat_final['val_date']  = res_estrat_final['val_date'].dt.date
-    
+    res_estrat_final['val_date']  = res_estrat_final['val_date'].dt.date  
     
     estrat_maeji = res_book[res_book['estrategia']=='trm']
     estrat_maeji['tipo'] = np.where(estrat_maeji['tipo'] == 'book','risco','risco')
@@ -1296,7 +1267,7 @@ def var():
     to_alchemy_append_n(res_estrat_final,'resultados_estrategia')
     to_alchemy_append_n(prop_final,'proporcao')
     print ('Risco OK.')
-    return(res_estrat_final)
+    return(0)
 
 def perf_attrib():
   
