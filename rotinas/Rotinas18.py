@@ -1713,14 +1713,13 @@ def tgc_off():
     yesterday_arq = yesterday.strftime("%Y%m%d")
     fundos = ['rgq']
     #-------------------------------Calculo PL------------------------------------
-    hbp = recupera_bd2('select * from consolidado_pnl')
+    hbp = recupera_bd2("SELECT * FROM consolidado_pnl WHERE trading_desk ='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM';")
     de_para_fundos = pd.read_excel('I:/Riscos/Ludmilla/de_para_fundos.xlsx')
     #de_para_fundos = de_para_fundos.rename(columns={'TradingDesk': 'trading_desk'})
     hbp = hbp.merge(de_para_fundos,left_on = 'trading_desk', right_on = 'TradingDesk')
     hbp['val_date'] = pd.to_datetime(hbp['val_date'])
     hbp =hbp.drop(columns = 'trading_desk_x') 
     hbp = hbp.rename(columns = {'trading_desk_y':'trading_desk' })  
-    
     
     pl_fundos = pd.DataFrame()
     for i in fundos:
@@ -1737,23 +1736,27 @@ def tgc_off():
             pl = pl[['val_date','position_close']].groupby('val_date').sum().reset_index()
             pl = pl[pl['val_date']==yesterday]
             pl['trading_desk']=i
-            pl_fundos = pl_fundos.append(pl)
+            pl_fundos = pl_fundos.append(pl) 
+    pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
+    
+    explosao = recupera_bd2("SELECT * FROM proporcao_fundos WHERE fundo_destino='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM';")
+    explosao  = explosao [explosao ['fundo_origem']=='O3 MACRO INTERNATIONAL FUND']
+    exp_quali = explosao [explosao ['fundo_destino']=='O3 RETORNO GLOBAL QUALIFICADO MASTER FIM'].sort_values('data_ref').tail(1).reset_index().iloc[0]['proporcao']/100
+    
+    dic_off = {'MACRO_O3 OFF':'macro','QUANT OFF':'quant','TGC OFF':'tgc_off','TOP PICKS TENDENCIAS':'top_picks_tendencias','TDM':'tdm','TRM':'trm'}
+    df_pct = pd.DataFrame([['tgc_off',0.15]],columns=['Book','pct_book'])
+    macro2 = pd.read_csv('I:/Riscos/TotalVaR/historico/macro_nivel2_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
+    macro2 = macro2.rename(columns={'Date':'val_date','TotalVar':'total_var'}) 
+    macro2 = macro2.replace({'Book': dic_off})
+    macro2 = macro2.merge(df_pct,how='left')
+    macro2 = macro2.sort_values('val_date')
+    macro2['total_var_quali'] = (hist_dolar*macro2 ['total_var']*exp_quali)/(macro2 ['pct_book']*pl_quali)
+   
+    macro_quali = macro2[['Book','val_date','total_var_quali']]
+    macro_quali = macro_quali.rename(columns={'total_var_quali':'total_var'})
+    tgc_off_quali = macro_quali[macro_quali['Book']=='tgc_off']  
+    tgc_off_quali = tgc_off_quali.assign(val_date=tgc_off_quali['val_date'].dt.date)
 
-    #-------------------------------Importacao de dados----------------------------    
-    
-    def le_dados(fundo,nivel):
-        if 'param' in fundo:
-            tabela = pd.read_csv('I:/Riscos/TotalVaR/historico/' + fundo + '_nivel' + nivel +'_' + yesterday_arq + '.txt', sep='\t',parse_dates=['ValDate'])
-            tabela = tabela.rename(columns = {'ValDate' : 'val_date', 'ParametricVaR' : 'param_var'})
-            tabela['val_date'] = tabela['val_date'].dt.date 
-        elif 'stress' in fundo:
-            tabela = pd.read_csv('I:/Riscos/TotalVaR/historico/' + fundo + '_nivel' + nivel +'_' + yesterday_arq + '.txt', sep='\t')
-        else:
-            tabela = pd.read_csv('I:/Riscos/TotalVaR/historico/' + fundo + '_nivel' + nivel +'_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-            tabela = tabela.rename(columns = {'Date' : 'val_date', 'TotalVar' : 'total_var'})
-            tabela['val_date'] = tabela['val_date'].dt.date 
-        return (tabela)  
-    
     #-------------------------------Funcoes Rotina---------------------------------
     
     def resultados_book2(df,data,fundo,book):   
@@ -1775,32 +1778,26 @@ def tgc_off():
         vol_ewma = abs(vol_ewma.iloc[0][0])
         resultados = pd.DataFrame([[data,fundo,book,'te_equities',vol_24,vol_60,vol_ewma,es_pct,var_1pct]],columns=['val_date','trading_desk','estrategia','tipo','vol_24_meses','vol_60_meses','vol_ewma','es_21du','var_1du'])
         return(resultados)  
-      
-
+     
     
     #Books TGC 
 
     ibov = recupera_bd("SELECT * FROM precos where ticker='IBOV Index'")
     ibov['ibov'] = ibov['px_last']/ibov['px_last'].shift(1)-1 
     ibov['val_date'] = pd.to_datetime(ibov['val_date'])
+    
     spx = recupera_bd("SELECT * FROM precos where ticker='SPX Index'")
     spx['val_date'] = pd.to_datetime(spx['val_date'])
+    spx['val_date'] = spx['val_date'].dt.date
     spx['spx'] = spx['px_last']/spx['px_last'].shift(1)-1 
     
-    pct_tgc_off = 0.15
-    pct_tgc_on = 0.03
-    
-    pl_quali = pl_fundos[pl_fundos['trading_desk'] == 'rgq'].iloc[0]['position_close']
+   
     
     #pl_geral = pl_fundos[pl_fundos['trading_desk'] == 'rgm'].iloc[0]['position_close']
     
-    # leitura de dados
-
-    tgc_off_quali = pd.read_csv('I:/Riscos/TotalVaR/historico/usd_brl/tgc_off_quali_' + yesterday_arq + '.txt', sep='\t',parse_dates=['Date'])
-    tgc_off_quali = tgc_off_quali.rename(columns={'Date':'val_date'})
-
     # ajustes off
-    tgc_off_quali['aux'] = (tgc_off_quali['TotalVar']-tgc_off_quali['Total USDBRLSpot'])/(pl_quali*pct_tgc_off)   
+    tgc_off_quali = tgc_off_quali.rename(columns={'total_var':'aux'})
+    #tgc_off_quali['aux'] = (tgc_off_quali['TotalVar']-tgc_off_quali['Total USDBRLSpot'])/(pl_quali*pct_tgc_off)   
     tgc_off_quali = tgc_off_quali.merge(spx,how = 'left')
     
     tgc_off_quali['dif_off_spx'] =  tgc_off_quali['aux'] - tgc_off_quali['spx']
@@ -1834,7 +1831,8 @@ def tgc_off():
     
     
     ten_year = recupera_bd("SELECT val_date,px_last FROM precos where ticker='USGG10YR Index'")
-    ten_year['val_date'] = pd.to_datetime(ten_year['val_date']) 
+    ten_year['val_date'] = pd.to_datetime(ten_year['val_date'])
+    ten_year['val_date'] = ten_year['val_date'].dt.date
     ten_year['10_yr_returns'] =  ten_year['px_last']-ten_year['px_last'].shift(1)
     tgc_off_quali = tgc_off_quali.merge(ten_year)
     
@@ -1845,9 +1843,9 @@ def tgc_off():
     tgc_off_quali = tgc_off_quali.rename(columns = {'total_var':'retorno_tgc'})
     
     to_alchemy_replace_n(tgc_off_quali,'tgc_off_rolling')
+
     print ('Backtest TGC Off Ok!')
     return(0)
-
 class janela:
   
     def __init__(self, raiz):
